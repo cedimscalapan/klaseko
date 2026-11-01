@@ -26,6 +26,55 @@ void main() {
     stdout.writeln('Set minSdk 23 in $name');
   }
 
+  // Some plugins still compile against an older Android SDK than the AndroidX libraries they pull in,
+  // which fails the release build's AAR metadata check. Compile every plugin against SDK 36.
+  // The hook goes before `evaluationDependsOn(":app")` so it is registered before any project is evaluated.
+  const ktsHook = '''
+// KlaseKo: compile every plugin against a recent Android SDK.
+subprojects {
+    val raiseCompileSdk = {
+        val androidExt = extensions.findByName("android")
+        if (androidExt != null) {
+            try {
+                androidExt.javaClass.getMethod("compileSdkVersion", Int::class.javaPrimitiveType).invoke(androidExt, 36)
+            } catch (e: Exception) {
+                logger.warn("KlaseKo: could not set compileSdk for " + project.name + ": " + e.message)
+            }
+        }
+    }
+    if (state.executed) raiseCompileSdk() else afterEvaluate { raiseCompileSdk() }
+}
+
+''';
+  const groovyHook = '''
+// KlaseKo: compile every plugin against a recent Android SDK.
+subprojects { p ->
+    def raiseCompileSdk = {
+        def androidExt = p.extensions.findByName("android")
+        if (androidExt != null) {
+            try {
+                androidExt.compileSdkVersion(36)
+            } catch (e) {
+                p.logger.warn("KlaseKo: could not set compileSdk for " + p.name + ": " + e.message)
+            }
+        }
+    }
+    if (p.state.executed) raiseCompileSdk() else p.afterEvaluate { raiseCompileSdk() }
+}
+
+''';
+  for (final (name, hook) in [('android/build.gradle.kts', ktsHook), ('android/build.gradle', groovyHook)]) {
+    final f = File(name);
+    if (!f.existsSync()) continue;
+    var s = f.readAsStringSync();
+    if (s.contains('KlaseKo: compile every plugin')) continue;
+    final dep = s.indexOf('evaluationDependsOn');
+    final at = dep < 0 ? -1 : s.lastIndexOf('subprojects', dep);
+    s = at < 0 ? '$s\n$hook' : '${s.substring(0, at)}$hook${s.substring(at)}';
+    f.writeAsStringSync(s);
+    stdout.writeln('Added compileSdk 36 hook to $name');
+  }
+
   final plist = File('ios/Runner/Info.plist');
   if (plist.existsSync()) {
     var s = plist.readAsStringSync();

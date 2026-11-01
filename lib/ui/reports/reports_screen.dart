@@ -71,21 +71,6 @@ class ReportsScreen extends StatelessWidget {
     );
   }
 
-  Widget _tile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: AppCard(
-          onTap: onTap,
-          child: Row(children: [
-            Icon(icon, color: brandBlue),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ]),
-            ),
-            const Icon(Icons.chevron_right),
-          ]),
-        ),
-      );
+  Widget _tile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap) =>
+      NavRow(icon: icon, title: title, subtitle: subtitle, onTap: onTap, color: brandBlue);
 }

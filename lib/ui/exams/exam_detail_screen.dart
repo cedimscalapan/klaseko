@@ -205,22 +205,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  Widget _step(IconData icon, String title, String subtitle, VoidCallback onTap, {bool highlight = false}) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: AppCard(
-          onTap: onTap,
-          color: highlight ? Theme.of(context).colorScheme.primaryContainer : null,
-          child: Row(children: [
-            Icon(icon, color: brandBlue),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ]),
-            ),
-            const Icon(Icons.chevron_right),
-          ]),
-        ),
-      );
+  Widget _step(IconData icon, String title, String subtitle, VoidCallback onTap, {bool highlight = false, Color color = brandBlue}) =>
+      NavRow(icon: icon, title: title, subtitle: subtitle, onTap: onTap, highlight: highlight, color: color);
 }

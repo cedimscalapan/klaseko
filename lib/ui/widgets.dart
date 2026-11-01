@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/store.dart';
 import 'theme.dart';
@@ -61,21 +62,34 @@ class _LoaderState<T> extends State<Loader<T>> {
   }
 }
 
+/// White card with a soft shadow. The building block of every screen.
 class AppCard extends StatelessWidget {
-  const AppCard({super.key, required this.child, this.onTap, this.padding = const EdgeInsets.all(16), this.color});
+  const AppCard({super.key, required this.child, this.onTap, this.padding = const EdgeInsets.all(16), this.color, this.radius = 20});
   final Widget child;
   final VoidCallback? onTap;
   final EdgeInsets padding;
   final Color? color;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: color ?? (Theme.of(context).brightness == Brightness.light ? Colors.white : const Color(0xFF161D2C)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: scheme.outlineVariant.withAlpha(140))),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+    final r = BorderRadius.circular(radius);
+    return Container(
+      decoration: BoxDecoration(borderRadius: r, boxShadow: color == null ? softShadow(context) : const []),
+      child: Material(
+        color: color ?? cardColor(context),
+        borderRadius: r,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
     );
   }
 }
@@ -87,14 +101,153 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+        padding: const EdgeInsets.fromLTRB(4, 22, 4, 10),
         child: Row(children: [
-          Expanded(
-            child: Text(text.toUpperCase(),
-                style: TextStyle(fontSize: 12, letterSpacing: 1.1, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
           if (trailing != null) trailing!,
         ]),
+      );
+}
+
+/// Rounded square with a tinted icon, used for actions and list rows.
+class IconBadge extends StatelessWidget {
+  const IconBadge(this.icon, {super.key, this.color = brandBlue, this.size = 46});
+  final IconData icon;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color.withAlpha(isDark(context) ? 50 : 28), borderRadius: BorderRadius.circular(size * 0.32)),
+        child: Icon(icon, color: color, size: size * 0.5),
+      );
+}
+
+/// A tappable row: icon, title, subtitle, chevron. Large touch target.
+class NavRow extends StatelessWidget {
+  const NavRow({super.key, required this.icon, required this.title, this.subtitle, required this.onTap, this.color = brandBlue, this.trailing, this.highlight = false});
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final Color color;
+  final Widget? trailing;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: AppCard(
+          onTap: onTap,
+          color: highlight ? color.withAlpha(isDark(context) ? 46 : 22) : null,
+          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+          child: Row(children: [
+            IconBadge(icon, color: color),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: mutedText(context))),
+                ],
+              ]),
+            ),
+            trailing ?? Icon(Icons.chevron_right_rounded, color: mutedText(context)),
+          ]),
+        ),
+      );
+}
+
+/// Big square action used in grids (class hub, quick actions).
+class ActionTile extends StatelessWidget {
+  const ActionTile({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.color = brandBlue, this.badge});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color color;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            IconBadge(icon, color: color, size: 44),
+            const Spacer(),
+            if (badge != null) Pill(badge!, color: color),
+          ]),
+          const Spacer(),
+          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: mutedText(context))),
+        ]),
+      );
+}
+
+/// Blue gradient header used at the top of the main screens.
+class HeroHeader extends StatelessWidget {
+  const HeroHeader({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 20)});
+  final Widget child;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          gradient: heroGradient,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: const [BoxShadow(color: Color(0x332557E8), blurRadius: 24, offset: Offset(0, 10))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: Stack(children: [
+            // Soft circles for depth.
+            Positioned(right: -40, top: -50, child: _circle(170, 0.10)),
+            Positioned(right: 40, bottom: -70, child: _circle(140, 0.07)),
+            Padding(padding: padding, child: DefaultTextStyle.merge(style: const TextStyle(color: Colors.white), child: child)),
+          ]),
+        ),
+      );
+
+  Widget _circle(double size, double opacity) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha((opacity * 255).round())),
+      );
+}
+
+/// White translucent button that sits on the hero header.
+class HeroAction extends StatelessWidget {
+  const HeroAction({super.key, required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Material(
+          color: Colors.white.withAlpha(38),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(children: [
+                Icon(icon, color: Colors.white, size: 26),
+                const SizedBox(height: 6),
+                Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ),
+        ),
       );
 }
 
@@ -110,42 +263,56 @@ class EmptyState extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(radius: 34, backgroundColor: Theme.of(context).colorScheme.primaryContainer, child: Icon(icon, size: 34)),
-            const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(message, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            if (action != null) ...[const SizedBox(height: 18), action!],
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: brandBlue.withAlpha(isDark(context) ? 50 : 22)),
+              child: Icon(icon, size: 42, color: brandBlue),
+            ),
+            const SizedBox(height: 18),
+            Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: mutedText(context), height: 1.45)),
+            if (action != null) ...[const SizedBox(height: 22), action!],
           ]),
         ),
       );
 }
 
 class StatTile extends StatelessWidget {
-  const StatTile({super.key, required this.label, required this.value, this.sub, this.color, this.pen = false, this.onTap});
+  const StatTile({super.key, required this.label, required this.value, this.sub, this.color, this.pen = false, this.onTap, this.icon});
   final String label;
   final String value;
   final String? sub;
   final Color? color;
   final bool pen;
   final VoidCallback? onTap;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => AppCard(
         onTap: onTap,
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 4),
-          Text(value,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                fontStyle: pen ? FontStyle.italic : FontStyle.normal,
-                color: color ?? (pen ? penRed : null),
-                fontFeatures: const [FontFeature.tabularFigures()],
-              )),
-          if (sub != null) Text(sub!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Row(children: [
+            if (icon != null) ...[Icon(icon, size: 18, color: color ?? brandBlue), const SizedBox(width: 6)],
+            Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: mutedText(context)))),
+          ]),
+          const Spacer(),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  fontStyle: pen ? FontStyle.italic : FontStyle.normal,
+                  color: color ?? (pen ? penRed : null),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                )),
+          ),
+          if (sub != null) Text(sub!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: mutedText(context))),
         ]),
       );
 }
@@ -164,36 +331,66 @@ class PenScore extends StatelessWidget {
 }
 
 class Pill extends StatelessWidget {
-  const Pill(this.text, {super.key, required this.color});
+  const Pill(this.text, {super.key, required this.color, this.icon});
   final String text;
   final Color color;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(color: color.withAlpha(36), borderRadius: BorderRadius.circular(99)),
-        child: Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: color.withAlpha(isDark(context) ? 60 : 30), borderRadius: BorderRadius.circular(99)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[Icon(icon, size: 14, color: color), const SizedBox(width: 4)],
+          Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        ]),
+      );
+}
+
+/// Thin rounded progress bar.
+class SlimProgress extends StatelessWidget {
+  const SlimProgress({super.key, required this.value, this.color = brandBlue, this.height = 8});
+  final double value;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(height),
+        child: LinearProgressIndicator(
+          value: value.clamp(0, 1).toDouble(),
+          minHeight: height,
+          color: color,
+          backgroundColor: color.withAlpha(isDark(context) ? 50 : 26),
+        ),
       );
 }
 
 Color gradeColor(int? g) => g == null ? Colors.grey : g >= 90 ? goodGreen : g >= 75 ? brandBlue : penRed;
 
-void toast(BuildContext context, String message) {
+void toast(BuildContext context, String message, {bool success = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
+    ..showSnackBar(SnackBar(
+      content: Row(children: [
+        if (success) ...[const Icon(Icons.check_circle_rounded, color: Colors.white), const SizedBox(width: 10)],
+        Expanded(child: Text(message)),
+      ]),
+      backgroundColor: success ? goodGreen : null,
+    ));
 }
 
 Future<bool> confirm(BuildContext context, {required String title, required String message, String action = 'Delete', bool danger = true}) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text(title),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Text(title, style: Theme.of(ctx).textTheme.titleLarge),
       content: Text(message),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
         FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: penRed, minimumSize: const Size(64, 44)) : FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+          style: danger ? FilledButton.styleFrom(backgroundColor: penRed, minimumSize: const Size(64, 46)) : FilledButton.styleFrom(minimumSize: const Size(64, 46)),
           onPressed: () => Navigator.pop(ctx, true),
           child: Text(action),
         ),
@@ -211,7 +408,10 @@ Future<T?> withProgress<T>(BuildContext context, String message, Future<T> Funct
     barrierDismissible: false,
     builder: (_) => PopScope(
       canPop: false,
-      child: AlertDialog(content: Row(children: [const CircularProgressIndicator(), const SizedBox(width: 18), Expanded(child: Text(message))])),
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: Row(children: [const CircularProgressIndicator(), const SizedBox(width: 18), Expanded(child: Text(message))]),
+      ),
     ),
   );
   try {

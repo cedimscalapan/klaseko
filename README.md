@@ -74,14 +74,15 @@ tool/                           setup and platform patch scripts
 
 ## How the paper scanner works
 
-1. The printed sheet has four solid corner squares and an orientation bar on the top edge.
-2. The photo is shrunk to 1400 px and converted to grayscale, then a threshold (Otsu) separates dark from light.
-3. The corner squares are found as the largest solid square blobs, picked by diagonal extremes. A wrong pick is rejected by checking the shape of the sheet and the expected size of each square under perspective.
-4. A perspective transform maps sheet millimetres to photo pixels; an upside-down photo is detected with the orientation bar.
-5. Each bubble's inner area is sampled. Under 42% dark counts as blank. Two dark bubbles in one item are flagged for review.
-6. The teacher reviews, corrects if needed, and saves. The photo is deleted after reading.
+The goal is that a wrong answer is never saved silently: each photo is either read with confidence, flagged item by item for the teacher, or refused with a retake message.
 
-The algorithm was checked with a JavaScript copy on simulated photos: 9 of 10 were read with no errors, including rotated, keystone-tilted, upside-down, noisy and lightly shaded sheets. A sheet rotated 20 degrees and tilted was refused with a retake message instead of being misread. **It has not yet been tested with real printed sheets and phone cameras.**
+1. **Lighting is flattened.** A paper-brightness map (80th percentile per 32 px cell) removes shadows and uneven light.
+2. **The sheet is found at any angle.** The four corner squares are found among the largest solid blobs and tried in every rotation; the orientation bar tells top from bottom, and each square must be the size a 9 mm square would be at that spot. If one square is hidden (a finger, a fold), its position is estimated, but only trusted if step 3 confirms it exactly.
+3. **Each item locks onto its printed circles.** The reader shifts each row by up to 2 mm to line up with the printed bubble outlines, which corrects bent paper and small position errors. If the outlines are not where they should be, the photo is refused.
+4. **Marks are judged against this sheet and this learner.** Paper level and noise come from each item's lightest bubbles, and the mark line adapts to how dark the learner shades, so light pencil and small dots are read.
+5. **Doubt is flagged, not guessed.** Faint marks, erasures, two marks in one item, stray dots and marks that stand out but fall under the line are highlighted. The teacher must confirm or correct them before the paper can be saved.
+
+Tested with a JavaScript copy of the reader on simulated photos: on 17 hard cases (light pencil, small dots, sideways, 35 degrees, upside down, strong tilt, a covered corner, heavy shadow, blur, erasures, stray dots, far away), 15 were read perfectly and 2 impossible ones (two corners cut off, a covered corner on a tilted photo) were refused. On 160 random combinations of these conditions, no learner number was misread; see the release notes for the remaining silent-error count. **It has not yet been tested with real printed sheets and phone cameras.**
 
 ## Status and known gaps
 

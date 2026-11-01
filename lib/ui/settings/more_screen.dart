@@ -93,22 +93,8 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
-  Widget _tile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap, {bool danger = false}) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: AppCard(
-          onTap: onTap,
-          child: Row(children: [
-            Icon(icon, color: danger ? penRed : brandBlue),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: danger ? penRed : null)),
-                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ]),
-            ),
-          ]),
-        ),
-      );
+  Widget _tile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap, {bool danger = false}) =>
+      NavRow(icon: icon, title: title, subtitle: subtitle, onTap: onTap, color: danger ? penRed : brandBlue);
 }
 
 class ProfileScreen extends StatefulWidget {

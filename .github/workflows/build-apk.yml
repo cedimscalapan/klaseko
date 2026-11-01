@@ -24,7 +24,9 @@ jobs:
       - name: Generate platform folders and patch them
         run: bash tool/setup.sh
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
       - name: Unit tests
         run: flutter test
       - name: Build APK
@@ -35,8 +37,10 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          [ -f build.log ] || exit 0
-          grep -i -E "error|what went wrong|failed|exception|could not|cannot|unresolved|requires|> " build.log | grep -v "^\s*$" | tail -90 > errs.txt || true
+          touch errs.txt
+          [ -f analyze.log ] && grep -E "^\s*error " analyze.log | head -60 >> errs.txt || true
+          [ -f build.log ] && grep -i -E "error|what went wrong|failed|exception|could not|cannot|unresolved|requires|> " build.log | grep -v "^\s*$" | tail -90 >> errs.txt || true
+          [ -s errs.txt ] || exit 0
           split -l 30 errs.txt part_
           for f in part_*; do
             msg=$(sed -e 's/%/%25/g' -e 's/\r//g' "$f" | sed ':a;N;$!ba;s/\n/%0A/g')

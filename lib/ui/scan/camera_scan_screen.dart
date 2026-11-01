@@ -315,6 +315,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
   late List<int> _answers;
   late Set<int> _toCheck;
   late bool _onlyToCheck;
+  bool _comparedLight = false;
   String? _lid;
 
   @override
@@ -341,6 +342,10 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
       toast(context, 'Please check the ${_toCheck.length} highlighted item(s) first.');
       return;
     }
+    if (widget.result.lightMarks && !_comparedLight) {
+      toast(context, 'This paper was shaded lightly. Compare it with the answers below, then tick the box.');
+      return;
+    }
     if (b.responses.containsKey(lid)) {
       final name = b.learners.firstWhere((l) => l.id == lid).fullName;
       final ok = await confirm(context, title: 'Replace the saved paper?', message: '$name already has a checked paper for this exam.', action: 'Replace', danger: false);
@@ -363,7 +368,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
     final score = scoreAnswers(b.items, _answers);
     final numRead = r.learnerNum;
     final unmatched = numRead != null && !b.learners.any((l) => l.num == numRead);
-    final ready = _toCheck.isEmpty && _lid != null;
+    final ready = _toCheck.isEmpty && _lid != null && (!r.lightMarks || _comparedLight);
     return Scaffold(
       appBar: AppBar(title: const Text('Check the result')),
       bottomNavigationBar: SafeArea(
@@ -378,7 +383,13 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
                 onPressed: _save,
                 style: ready ? null : FilledButton.styleFrom(backgroundColor: lateAmber),
                 icon: Icon(ready ? Icons.check_rounded : Icons.rule_rounded),
-                label: Text(ready ? 'Save $score/${b.items.length}' : (_lid == null ? 'Choose learner' : 'Check ${_toCheck.length} first')),
+                label: Text(ready
+                    ? 'Save $score/${b.items.length}'
+                    : _lid == null
+                        ? 'Choose learner'
+                        : _toCheck.isNotEmpty
+                            ? 'Check ${_toCheck.length} first'
+                            : 'Compare first'),
               ),
             ),
           ]),
@@ -419,6 +430,21 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
           ],
           onChanged: (v) => setState(() => _lid = v),
         ),
+        if (r.lightMarks) ...[
+          const SizedBox(height: 14),
+          AppCard(
+            color: lateAmber.withAlpha(isDark(context) ? 46 : 24),
+            padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+            child: CheckboxListTile(
+              value: _comparedLight,
+              onChanged: (v) => setState(() => _comparedLight = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('I compared these answers with the paper', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('This learner shaded very lightly, so an erased mark can look like an answer. A quick look at the paper keeps the score right.'),
+            ),
+          ),
+        ],
         if (widget.result.review.isNotEmpty) ...[
           const SizedBox(height: 14),
           AppCard(

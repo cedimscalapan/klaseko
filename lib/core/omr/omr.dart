@@ -42,6 +42,10 @@ class OmrResult {
   /// True when one corner square was hidden and its position was estimated (and then confirmed).
   final bool estimatedCorner;
 
+  /// True when the learner shaded very lightly. Erasures can then be as dark as real answers,
+  /// so the teacher must compare the whole sheet with the paper before saving.
+  final bool lightMarks;
+
   const OmrResult({
     required this.ok,
     this.error,
@@ -50,6 +54,7 @@ class OmrResult {
     this.review = const [],
     this.fills = const [],
     this.estimatedCorner = false,
+    this.lightMarks = false,
   });
 
   factory OmrResult.fail(String message) => OmrResult(ok: false, error: message);
@@ -134,6 +139,7 @@ OmrResult readAnswerSheet(OmrRequest req) {
       review: review.toList()..sort(),
       fills: rows,
       estimatedCorner: sheet.estimated,
+      lightMarks: cls.lightMarks,
     );
   } catch (e) {
     return OmrResult.fail('Reading failed: $e');
@@ -566,7 +572,8 @@ double _darknessAt(_Img im, _Homography hom, double cx, double cy, double r) {
 class _Classified {
   final List<int> answers;
   final List<int> review;
-  _Classified(this.answers, this.review);
+  final bool lightMarks;
+  _Classified(this.answers, this.review, {this.lightMarks = false});
 }
 
 /// Decides each item's answer using this sheet's own statistics.
@@ -609,13 +616,15 @@ _Classified _classify(List<List<double>> rows) {
       // than this learner's usual marks, or the sheet has too few marks to know what a light mark means.
       final secondMarked = second > max(0.5 * (thr - base), max(4 * mad, 0.025));
       final light = fewMarks && top < 0.35;
+      // A mark far darker than this learner's usual marks may be an erasure or a correction: show it too.
+      final unusual = markLevel > 0 && top > markLevel * 2.2;
       answers.add(order[0]);
-      flag = second > top * 0.45 || top < level * 0.55 || secondMarked || light;
+      flag = second > top * 0.45 || top < level * 0.55 || secondMarked || light || unusual;
     } else {
       answers.add(-2);
       flag = true;
     }
     if (flag) review.add(i);
   }
-  return _Classified(answers, review);
+  return _Classified(answers, review, lightMarks: answered.isNotEmpty && markLevel < 0.25);
 }

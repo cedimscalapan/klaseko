@@ -12,8 +12,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -28,7 +28,20 @@ jobs:
       - name: Unit tests
         run: flutter test
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee build.log
+      # Posts the important lines of a failed build as annotations, which are readable without signing in.
+      - name: Report build errors
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          grep -i -E "error|what went wrong|failed|exception|could not|cannot|unresolved|requires|> " build.log | grep -v "^\s*$" | tail -90 > errs.txt || true
+          split -l 30 errs.txt part_
+          for f in part_*; do
+            msg=$(sed -e 's/%/%25/g' -e 's/\r//g' "$f" | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Build APK log ($f)::$msg"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: klaseko-apk

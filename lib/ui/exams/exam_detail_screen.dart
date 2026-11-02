@@ -215,6 +215,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  Widget _step(IconData icon, String title, String subtitle, VoidCallback onTap, {bool highlight = false, Color color = brandBlue}) =>
+  Widget _step(IconData icon, String title, String subtitle, VoidCallback onTap, {bool highlight = false, Color? color}) =>
       NavRow(icon: icon, title: title, subtitle: subtitle, onTap: onTap, highlight: highlight, color: color);
 }

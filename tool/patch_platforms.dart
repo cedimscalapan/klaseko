@@ -75,6 +75,23 @@ subprojects { p ->
     stdout.writeln('Added compileSdk 36 hook to $name');
   }
 
+  // Text recognition ships only the Latin model; tell the release shrinker (R8) that the other
+  // script models referenced by the plugin are intentionally absent.
+  final rules = File('android/app/proguard-rules.pro');
+  if (Directory('android/app').existsSync()) {
+    final existing = rules.existsSync() ? rules.readAsStringSync() : '';
+    if (!existing.contains('com.google.mlkit.vision.text.chinese')) {
+      rules.writeAsStringSync('''$existing
+# KlaseKo: only the Latin text recognition model is bundled.
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**
+''');
+      stdout.writeln('Wrote android/app/proguard-rules.pro');
+    }
+  }
+
   final plist = File('ios/Runner/Info.plist');
   if (plist.existsSync()) {
     var s = plist.readAsStringSync();

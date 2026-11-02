@@ -227,10 +227,11 @@ Future<Uint8List> buildTestPaper({
             pw.SizedBox(height: 8),
           ])
         : pw.SizedBox(),
-    footer: (ctx) => pw.Align(
-      alignment: pw.Alignment.centerRight,
-      child: _t('Page ${ctx.pageNumber} of ${ctx.pagesCount}', size: 7, color: PdfColors.grey600),
-    ),
+    footer: (ctx) => pw.Row(children: [
+      _t('Prepared with KlaseKo', size: 7, color: PdfColors.grey500),
+      pw.Spacer(),
+      _t('Page ${ctx.pageNumber} of ${ctx.pagesCount}', size: 7, color: PdfColors.grey600),
+    ]),
     build: (ctx) => [
       for (var i = 0; i < items.length; i++)
         pw.Padding(

@@ -12,6 +12,8 @@ import '../../core/models.dart';
 import '../../core/sample.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../brand.dart';
+import 'about_screen.dart';
 import 'profile_form.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -82,6 +84,7 @@ class MoreScreen extends StatelessWidget {
         _tile(context, Icons.rule_outlined, 'Grading rules', 'How KlaseKo computes grades (DO 015, s. 2026)', () => push(context, const RulesScreen())),
         _tile(context, Icons.print_outlined, 'Printing answer sheets', 'Tips for sheets the camera reads well', () => push(context, const PrintTipsScreen())),
         _tile(context, Icons.lock_outline, 'Privacy', 'Where your learners\' data is kept', () => push(context, const PrivacyScreen())),
+        _tile(context, Icons.info_outline_rounded, 'About KlaseKo', 'Version, licenses and what the name means', () => push(context, const AboutScreen())),
         const SectionTitle('Danger zone'),
         _tile(context, Icons.delete_forever_outlined, 'Erase everything', 'Delete all data on this phone and start over', () async {
           final ok = await confirm(context, title: 'Erase all KlaseKo data?', message: 'Classes, learners, attendance, scores and exams on this phone are deleted. This cannot be undone.', action: 'Erase');
@@ -90,7 +93,9 @@ class MoreScreen extends StatelessWidget {
           await store.reloadProfile();
         }, danger: true),
         const SizedBox(height: 16),
-        Center(child: Text('KlaseKo 1.0.0 · Works offline', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+        const Center(child: BrandLogo(size: 30)),
+        const SizedBox(height: 6),
+        Center(child: Text('Version ${Brand.version} · Works offline', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
       ]),
     );
   }

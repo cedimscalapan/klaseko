@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/sample.dart';
 import 'settings/profile_form.dart';
+import 'brand.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -56,16 +57,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _welcome() => ListView(padding: const EdgeInsets.all(24), children: [
         const SizedBox(height: 24),
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(color: brandBlue, borderRadius: BorderRadius.circular(20)),
-          child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
-        ),
-        const SizedBox(height: 24),
-        const Text('KlaseKo', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
+        const BrandMark(size: 84),
+        const SizedBox(height: 22),
+        const BrandWordmark(size: 38),
         const SizedBox(height: 6),
-        const Text('Isang entry, tapos na ang forms.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+        const Text(Brand.tagline, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(Brand.description, style: TextStyle(color: mutedText(context))),
         const SizedBox(height: 18),
         for (final f in const [
           [Icons.fact_check_outlined, 'Attendance in a few taps', 'Your SF2 fills itself every month.'],

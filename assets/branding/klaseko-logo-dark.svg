@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1880 420" role="img" aria-label="KlaseKo">
+  <defs>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#173E75"/>
+      <stop offset="1" stop-color="#0F2D57"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(10 10) scale(0.390625)">
+    <rect width="1024" height="1024" rx="230" fill="url(#navy)"/>
+    <circle cx="472" cy="542" r="262" fill="#FFFFFF"/>
+    <polyline points="352,546 444,640 610,430" fill="none" stroke="#0F2D57" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="748" cy="276" r="104" fill="#D8B567"/>
+  </g>
+  <text x="470" y="250" font-family="Lexend, 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="230" letter-spacing="-5">
+    <tspan fill="#FFFFFF">Klase</tspan><tspan fill="#D8B567">Ko</tspan>
+  </text>
+  <text x="474" y="350" font-family="Lexend, 'Segoe UI', Arial, sans-serif" font-weight="500" font-size="62" fill="#9BA5B3">Isang entry, tapos na ang forms.</text>
+</svg>

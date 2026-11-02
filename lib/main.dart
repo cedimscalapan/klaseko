@@ -9,6 +9,10 @@ import 'ui/theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+  // The Lexend font license, shown under About > Open-source licenses.
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(['Lexend font'], await rootBundle.loadString('assets/fonts/OFL.txt'));
+  });
   await AppStore.init();
   runApp(const KlaseKoApp());
 }

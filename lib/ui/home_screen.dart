@@ -5,6 +5,8 @@ import '../core/export/form_data.dart';
 import '../core/grading.dart';
 import '../core/models.dart';
 import 'attendance/attendance_screen.dart';
+import 'brand.dart';
+import 'settings/about_screen.dart';
 import 'classes/class_detail_screen.dart';
 import 'classes/class_form.dart';
 import 'grades/class_record_screen.dart';
@@ -108,7 +110,19 @@ class HomeScreen extends StatelessWidget {
             ];
             final done = tasks.where((t) => t.$3).length;
 
-            return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
+            return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 28), children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+                child: Row(children: [
+                  const BrandLogo(size: 34),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'About KlaseKo',
+                    icon: Icon(Icons.info_outline_rounded, color: mutedText(context)),
+                    onPressed: () => push(context, const AboutScreen()),
+                  ),
+                ]),
+              ),
               HeroHeader(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [

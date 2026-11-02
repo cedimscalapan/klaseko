@@ -40,6 +40,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/OFL.txt
   # Lexend (SIL Open Font License, assets/fonts/OFL.txt) is designed for easy reading; bundled so it works offline.
   fonts:
     - family: Lexend

@@ -1,8 +1,0 @@
-# Launch screen. Generated during setup with:  dart pub global run flutter_native_splash:create
-flutter_native_splash:
-  color: "#0F2D57"
-  image: assets/branding/splash.png
-  android_12:
-    color: "#0F2D57"
-    image: assets/branding/splash_android12.png
-  web: false

@@ -1,5 +1,5 @@
 // Adds what KlaseKo needs to the Android and iOS folders that `flutter create` generates:
-// camera permission, app name, minimum Android version and iOS permission messages.
+// camera permission, app name, minimum Android version, launch screen and iOS permission messages.
 // Run from the project folder: dart run tool/patch_platforms.dart
 import 'dart:io';
 
@@ -90,6 +90,42 @@ subprojects { p ->
 ''');
       stdout.writeln('Wrote android/app/proguard-rules.pro');
     }
+  }
+
+  // Launch screen: the KlaseKo symbol on navy. Android 12+ uses its own splash API, so it gets
+  // separate styles (light and dark, since night resources outrank API-level ones).
+  const res = 'android/app/src/main/res';
+  if (Directory(res).existsSync()) {
+    Directory('$res/drawable-xxxhdpi').createSync(recursive: true);
+    File('assets/branding/splash.png').copySync('$res/drawable-xxxhdpi/klaseko_splash.png');
+    File('assets/branding/splash_android12.png').copySync('$res/drawable-xxxhdpi/klaseko_splash12.png');
+    const background = '''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="#0F2D57" /></item>
+    <item><bitmap android:gravity="center" android:src="@drawable/klaseko_splash" /></item>
+</layer-list>
+''';
+    for (final dir in ['drawable', 'drawable-v21']) {
+      Directory('$res/$dir').createSync(recursive: true);
+      File('$res/$dir/launch_background.xml').writeAsStringSync(background);
+    }
+    String styles(String parent) => '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="$parent">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">#0F2D57</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/klaseko_splash12</item>
+    </style>
+    <style name="NormalTheme" parent="$parent">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
+''';
+    for (final (dir, parent) in [('values-v31', '@android:style/Theme.Light.NoTitleBar'), ('values-night-v31', '@android:style/Theme.Black.NoTitleBar')]) {
+      Directory('$res/$dir').createSync(recursive: true);
+      File('$res/$dir/styles.xml').writeAsStringSync(styles(parent));
+    }
+    stdout.writeln('Wrote the Android launch screen');
   }
 
   final plist = File('ios/Runner/Info.plist');

@@ -7,11 +7,9 @@ if (-not (Test-Path 'android')) {
 }
 dart run tool/patch_platforms.dart
 flutter pub get
-# Brand: app icon and launch screen (standalone tools, so their dependencies stay out of the app).
+# Brand: app icon (standalone tool, so its dependencies stay out of the app). The launch screen is written by patch_platforms.
 dart pub global activate flutter_launcher_icons 0.14.4
 dart pub global run flutter_launcher_icons
-dart pub global activate flutter_native_splash 2.4.8
-dart pub global run flutter_native_splash:create
 Write-Host ''
 Write-Host 'Setup done. Plug in an Android phone with USB debugging on, then run:  flutter run'
 Write-Host 'To make an installable APK:  flutter build apk --release'

@@ -146,7 +146,7 @@ class _LearnerFormScreenState extends State<LearnerFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(editing ? 'Edit learner' : 'Add learner'),
-        actions: [if (editing) IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline, color: penRed), tooltip: 'Delete')],
+        actions: [if (editing) IconButton(onPressed: _delete, icon: Icon(Icons.delete_outline, color: penRed), tooltip: 'Delete')],
       ),
       body: Form(
         key: _formKey,
@@ -280,7 +280,7 @@ class _ImportLearnersScreenState extends State<ImportLearnersScreen> {
         if (_errors.isNotEmpty)
           AppCard(
             color: penRed.withAlpha(20),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [for (final e in _errors) Text(e, style: const TextStyle(color: penRed))]),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [for (final e in _errors) Text(e, style: TextStyle(color: penRed))]),
           ),
         if (_parsed.isNotEmpty) ...[
           SectionTitle('${_parsed.length} learners ready'),

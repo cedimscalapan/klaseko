@@ -68,6 +68,8 @@ class MoreScreen extends StatelessWidget {
             const Icon(Icons.edit_outlined),
           ]),
         ),
+        const SectionTitle('Appearance'),
+        _tile(context, Icons.contrast_rounded, 'Theme', _themeLabel(p.themeMode), () => _chooseTheme(context)),
         const SectionTitle('Your data'),
         _tile(context, Icons.backup_outlined, 'Back up', 'Save all classes, scores and exams to one file. Keep it in Google Drive or a USB drive.', () => _backup(context)),
         _tile(context, Icons.restore_outlined, 'Restore', 'Bring back data from a KlaseKo backup file, for example on a new phone.', () => _restore(context)),
@@ -91,6 +93,40 @@ class MoreScreen extends StatelessWidget {
         Center(child: Text('KlaseKo 1.0.0 · Works offline', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
       ]),
     );
+  }
+
+  String _themeLabel(String v) => switch (v) {
+        'light' => 'Light',
+        'dark' => 'Dark, easy on the eyes at night',
+        _ => 'Follows your phone setting',
+      };
+
+  Future<void> _chooseTheme(BuildContext context) async {
+    final current = store.profile.themeMode;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text('Theme', style: Theme.of(ctx).textTheme.titleLarge)),
+          for (final (value, title, subtitle, icon) in const [
+            ('system', 'Follow my phone', 'Light by day, dark when your phone is in dark mode', Icons.phone_android_rounded),
+            ('light', 'Light', 'Navy on soft white paper', Icons.light_mode_rounded),
+            ('dark', 'Dark', 'Soft blue-gray, gentle on the eyes at night', Icons.dark_mode_rounded),
+          ])
+            ListTile(
+              leading: Icon(icon),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(subtitle),
+              trailing: value == current ? Icon(Icons.check_circle_rounded, color: Theme.of(ctx).colorScheme.primary) : null,
+              onTap: () => Navigator.pop(ctx, value),
+            ),
+          const SizedBox(height: 12),
+        ]),
+      ),
+    );
+    if (picked == null || picked == current) return;
+    final p = SchoolProfile.fromSettings(store.profile.toSettings())..themeMode = picked;
+    await store.saveProfile(p);
   }
 
   Widget _tile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap, {bool danger = false}) =>

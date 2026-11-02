@@ -124,8 +124,8 @@ class _ManualCheckScreenState extends State<ManualCheckScreen> {
               store.changed();
               _load();
             },
-            icon: const Icon(Icons.delete_outline, color: penRed),
-            label: const Text('Remove checked paper', style: TextStyle(color: penRed)),
+            icon: Icon(Icons.delete_outline, color: penRed),
+            label: Text('Remove checked paper', style: TextStyle(color: penRed)),
           ),
       ]),
     );

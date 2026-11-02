@@ -230,7 +230,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                   padding: const EdgeInsets.all(5),
                   child: Container(
                     decoration: BoxDecoration(shape: BoxShape.circle, color: cam == null ? Colors.white24 : Colors.white),
-                    child: const Icon(Icons.document_scanner_rounded, color: brandBlue, size: 30),
+                    child: Icon(Icons.document_scanner_rounded, color: brandBlue, size: 30),
                   ),
                 ),
               ),
@@ -356,7 +356,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(numRead == null ? 'Learner number not shaded' : 'Learner no. ${two(numRead)}', style: Theme.of(context).textTheme.titleMedium),
-                if (unmatched) const Text('No learner has this number. Choose below.', style: TextStyle(color: penRed, fontSize: 13)),
+                if (unmatched) Text('No learner has this number. Choose below.', style: TextStyle(color: penRed, fontSize: 13)),
                 const SizedBox(height: 4),
                 Row(children: [
                   Icon(_toCheck.isEmpty ? Icons.verified_rounded : Icons.error_outline_rounded, size: 18, color: _toCheck.isEmpty ? goodGreen : lateAmber),
@@ -405,7 +405,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
           AppCard(
             color: lateAmber.withAlpha(isDark(context) ? 46 : 24),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Please look at the paper for the highlighted items',
+              Text('Please look at the paper for the highlighted items',
                   style: TextStyle(fontWeight: FontWeight.w700, color: lateAmber)),
               const SizedBox(height: 4),
               const Text(

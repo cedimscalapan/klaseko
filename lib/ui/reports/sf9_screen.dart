@@ -221,7 +221,7 @@ class _Sf9LearnerScreenState extends State<Sf9LearnerScreen> {
                   child: AppCard(
                     padding: const EdgeInsets.all(12),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(coreValues[i][0], style: const TextStyle(fontWeight: FontWeight.w800, color: brandBlue)),
+                      Text(coreValues[i][0], style: TextStyle(fontWeight: FontWeight.w800, color: brandBlue)),
                       Text(coreValues[i][1], style: const TextStyle(fontSize: 13)),
                       const SizedBox(height: 8),
                       Row(children: [

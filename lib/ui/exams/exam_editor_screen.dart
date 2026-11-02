@@ -197,7 +197,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                 }
                 _dirty = true;
               }),
-              itemBuilder: (_) => const [
+              itemBuilder: (_) => [
                 PopupMenuItem(value: 'up', child: Text('Move up')),
                 PopupMenuItem(value: 'down', child: Text('Move down')),
                 PopupMenuItem(value: 'dup', child: Text('Duplicate')),

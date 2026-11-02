@@ -151,7 +151,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     }
                   }
                 },
-                itemBuilder: (_) => const [
+                itemBuilder: (_) => [
                   PopupMenuItem(value: 'details', child: Text('Title, term and type')),
                   PopupMenuItem(value: 'delete', child: Text('Delete exam', style: TextStyle(color: penRed))),
                 ],
@@ -204,7 +204,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   title: Text(l.fullName),
                   leading: Text(two(l.num), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   trailing: b.responses[l.id] == null
-                      ? const Pill('Not yet', color: lateAmber)
+                      ? Pill('Not yet', color: lateAmber)
                       : PenScore('${b.responses[l.id]!.score}/${b.items.length}', size: 18),
                   onTap: ready ? () => push(context, ManualCheckScreen(examId: b.exam.id, learnerId: l.id)) : null,
                 ),

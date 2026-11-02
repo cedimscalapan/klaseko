@@ -379,6 +379,7 @@ class SchoolProfile {
   String sy;
   int terms;
   String paper; // letter, long, a4
+  String themeMode; // system, light, dark
 
   SchoolProfile({
     this.teacher = '',
@@ -391,6 +392,7 @@ class SchoolProfile {
     this.sy = '2026-2027',
     this.terms = 3,
     this.paper = 'letter',
+    this.themeMode = 'system',
   });
 
   Map<String, String> toSettings() => {
@@ -404,6 +406,7 @@ class SchoolProfile {
         'sy': sy,
         'terms': '$terms',
         'paper': paper,
+        'theme_mode': themeMode,
       };
 
   factory SchoolProfile.fromSettings(Map<String, String> s) => SchoolProfile(
@@ -417,6 +420,7 @@ class SchoolProfile {
         sy: s['sy'] ?? '2026-2027',
         terms: int.tryParse(s['terms'] ?? '') ?? 3,
         paper: s['paper'] ?? 'letter',
+        themeMode: s['theme_mode'] ?? 'system',
       );
 
   String termLabel(int t) => terms == 4 ? 'Q$t' : 'T$t';

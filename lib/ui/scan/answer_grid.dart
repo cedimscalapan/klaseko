@@ -72,7 +72,7 @@ class AnswerGrid extends StatelessWidget {
               IconButton(
                 tooltip: 'Looks right',
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.check_circle_outline_rounded, color: lateAmber),
+                icon: Icon(Icons.check_circle_outline_rounded, color: lateAmber),
                 onPressed: () {
                   HapticFeedback.selectionClick();
                   onConfirm!(i);

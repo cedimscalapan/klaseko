@@ -21,8 +21,7 @@ class _ClassSummary {
   _ClassSummary(this.cls, this.learners, this.attendanceToday, this.present, this.unchecked, this.belowPassing);
 }
 
-const _classColors = [brandBlue, violet, teal, Color(0xFFD9480F), Color(0xFF2B8A3E), Color(0xFFC2255C)];
-Color classColor(int i) => _classColors[i % _classColors.length];
+Color classColor(int i) => palette.classColors[i % palette.classColors.length];
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.onGo});
@@ -253,7 +252,7 @@ class HomeScreen extends StatelessWidget {
                   if (c.attendanceToday)
                     Pill('${c.present}/${c.learners} present', color: goodGreen, icon: Icons.check_rounded)
                   else
-                    const Pill('No attendance yet', color: lateAmber, icon: Icons.schedule_rounded),
+                    Pill('No attendance yet', color: lateAmber, icon: Icons.schedule_rounded),
                   if (c.unchecked > 0) Pill('${c.unchecked} to check', color: brandBlue, icon: Icons.document_scanner_rounded),
                   if (c.belowPassing > 0) Pill('${c.belowPassing} below 75', color: penRed, icon: Icons.trending_down_rounded),
                 ]),

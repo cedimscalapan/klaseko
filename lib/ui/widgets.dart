@@ -111,33 +111,38 @@ class SectionTitle extends StatelessWidget {
 
 /// Rounded square with a tinted icon, used for actions and list rows.
 class IconBadge extends StatelessWidget {
-  const IconBadge(this.icon, {super.key, this.color = brandBlue, this.size = 46});
+  const IconBadge(this.icon, {super.key, this.color, this.size = 46});
   final IconData icon;
-  final Color color;
+  final Color? color;
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final color = this.color ?? brandBlue;
+    return Container(
         width: size,
         height: size,
         decoration: BoxDecoration(color: color.withAlpha(isDark(context) ? 50 : 28), borderRadius: BorderRadius.circular(size * 0.32)),
         child: Icon(icon, color: color, size: size * 0.5),
       );
+  }
 }
 
 /// A tappable row: icon, title, subtitle, chevron. Large touch target.
 class NavRow extends StatelessWidget {
-  const NavRow({super.key, required this.icon, required this.title, this.subtitle, required this.onTap, this.color = brandBlue, this.trailing, this.highlight = false});
+  const NavRow({super.key, required this.icon, required this.title, this.subtitle, required this.onTap, this.color, this.trailing, this.highlight = false});
   final IconData icon;
   final String title;
   final String? subtitle;
   final VoidCallback onTap;
-  final Color color;
+  final Color? color;
   final Widget? trailing;
   final bool highlight;
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    final color = this.color ?? brandBlue;
+    return Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: AppCard(
           onTap: onTap,
@@ -159,20 +164,23 @@ class NavRow extends StatelessWidget {
           ]),
         ),
       );
+  }
 }
 
 /// Big square action used in grids (class hub, quick actions).
 class ActionTile extends StatelessWidget {
-  const ActionTile({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.color = brandBlue, this.badge});
+  const ActionTile({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.color, this.badge});
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final Color color;
+  final Color? color;
   final String? badge;
 
   @override
-  Widget build(BuildContext context) => AppCard(
+  Widget build(BuildContext context) {
+    final color = this.color ?? brandBlue;
+    return AppCard(
         onTap: onTap,
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -187,6 +195,7 @@ class ActionTile extends StatelessWidget {
           Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: mutedText(context))),
         ]),
       );
+  }
 }
 
 /// Blue gradient header used at the top of the main screens.
@@ -200,7 +209,7 @@ class HeroHeader extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: heroGradient,
           borderRadius: BorderRadius.circular(26),
-          boxShadow: const [BoxShadow(color: Color(0x332557E8), blurRadius: 24, offset: Offset(0, 10))],
+          boxShadow: isDark(context) ? const [] : const [BoxShadow(color: Color(0x2E0F2D57), blurRadius: 22, offset: Offset(0, 8))],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(26),
@@ -349,13 +358,15 @@ class Pill extends StatelessWidget {
 
 /// Thin rounded progress bar.
 class SlimProgress extends StatelessWidget {
-  const SlimProgress({super.key, required this.value, this.color = brandBlue, this.height = 8});
+  const SlimProgress({super.key, required this.value, this.color, this.height = 8});
   final double value;
-  final Color color;
+  final Color? color;
   final double height;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
+  Widget build(BuildContext context) {
+    final color = this.color ?? brandBlue;
+    return ClipRRect(
         borderRadius: BorderRadius.circular(height),
         child: LinearProgressIndicator(
           value: value.clamp(0, 1).toDouble(),
@@ -364,6 +375,7 @@ class SlimProgress extends StatelessWidget {
           backgroundColor: color.withAlpha(isDark(context) ? 50 : 26),
         ),
       );
+  }
 }
 
 Color gradeColor(int? g) => g == null ? Colors.grey : g >= 90 ? goodGreen : g >= 75 ? brandBlue : penRed;

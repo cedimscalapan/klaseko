@@ -13,6 +13,12 @@ Future<void> main() async {
   runApp(const KlaseKoApp());
 }
 
+ThemeMode themeModeOf(String v) => switch (v) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+
 class KlaseKoApp extends StatelessWidget {
   const KlaseKoApp({super.key});
 
@@ -25,8 +31,46 @@ class KlaseKoApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
+        themeMode: themeModeOf(AppStore.instance.profile.themeMode),
+        builder: (context, child) => PaletteScope(brightness: Theme.of(context).brightness, child: child ?? const SizedBox()),
         home: AppStore.instance.onboarded ? const Shell() : const OnboardingScreen(),
       ),
     );
+  }
+}
+
+/// Keeps the shared palette in step with the theme on screen. When the theme switches (from the
+/// Appearance setting or the phone's dark mode), every screen is redrawn with the new colors
+/// while keeping its place and its data.
+class PaletteScope extends StatefulWidget {
+  const PaletteScope({super.key, required this.brightness, required this.child});
+  final Brightness brightness;
+  final Widget child;
+
+  @override
+  State<PaletteScope> createState() => _PaletteScopeState();
+}
+
+class _PaletteScopeState extends State<PaletteScope> {
+  @override
+  void didUpdateWidget(PaletteScope old) {
+    super.didUpdateWidget(old);
+    if (old.brightness != widget.brightness) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        void visit(Element e) {
+          e.markNeedsBuild();
+          e.visitChildren(visit);
+        }
+
+        (context as Element).visitChildren(visit);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    usePalette(widget.brightness);
+    return widget.child;
   }
 }

@@ -146,7 +146,7 @@ class ItemAnalysisScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text('More learners chose ${'ABCD'[top]} than the correct answer. Check for a misconception or a wrong key.',
-                  style: const TextStyle(fontSize: 12, color: penRed)),
+                  style: TextStyle(fontSize: 12, color: penRed)),
             ),
         ]),
       ),

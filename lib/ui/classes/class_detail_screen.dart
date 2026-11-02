@@ -64,7 +64,7 @@ class ClassDetailScreen extends StatelessWidget {
               IconButton(tooltip: 'Edit class', icon: const Icon(Icons.edit_outlined), onPressed: () => push(context, ClassFormScreen(existing: c))),
               PopupMenuButton<String>(
                 onSelected: (v) => v == 'delete' ? _delete(context, c) : null,
-                itemBuilder: (_) => const [
+                itemBuilder: (_) => [
                   PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: penRed), title: Text('Delete class'))),
                 ],
               ),
@@ -143,7 +143,7 @@ class ClassDetailScreen extends StatelessWidget {
               icon: Icons.description_rounded,
               title: 'Reports and school forms',
               subtitle: c.advisory ? 'SF1, SF2, SF9, class record, grade sheet' : 'SF2, class record, grade sheet',
-              color: const Color(0xFFD9480F),
+              color: gold,
               onTap: () => push(context, ReportsScreen(cls: c)),
             ),
           ]),

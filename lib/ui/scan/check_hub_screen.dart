@@ -73,7 +73,7 @@ class CheckHubScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Row(children: [
-                    if (left > 0) Pill('$left left', color: lateAmber) else const Pill('All checked', color: goodGreen),
+                    if (left > 0) Pill('$left left', color: lateAmber) else Pill('All checked', color: goodGreen),
                     const Spacer(),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size(40, 40)),

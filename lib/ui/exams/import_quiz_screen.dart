@@ -150,7 +150,7 @@ class _ImportQuizScreenState extends State<ImportQuizScreen> {
             NavRow(icon: Icons.photo_camera_rounded, title: 'Take a photo of a printed quiz', subtitle: 'One page at a time, flat and in good light', onTap: () => _photo(ImageSource.camera)),
             NavRow(icon: Icons.photo_library_rounded, title: 'Choose a photo', subtitle: 'From your gallery or a screenshot', color: violet, onTap: () => _photo(ImageSource.gallery)),
             NavRow(icon: Icons.description_rounded, title: 'Word, PDF or text file', subtitle: '.docx, .pdf, .txt', color: teal, onTap: _file),
-            NavRow(icon: Icons.content_paste_rounded, title: 'Paste or type text', subtitle: 'From Messenger, email or anywhere', color: const Color(0xFFD9480F), onTap: _paste),
+            NavRow(icon: Icons.content_paste_rounded, title: 'Paste or type text', subtitle: 'From Messenger, email or anywhere', color: gold, onTap: _paste),
             const SizedBox(height: 10),
             AppCard(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -209,7 +209,7 @@ class _ImportQuizScreenState extends State<ImportQuizScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Icon(Icons.info_outline_rounded, size: 18, color: lateAmber),
+                    Icon(Icons.info_outline_rounded, size: 18, color: lateAmber),
                     const SizedBox(width: 8),
                     Expanded(child: Text(w, style: const TextStyle(fontSize: 13))),
                   ]),
@@ -287,7 +287,7 @@ class _ImportQuizScreenState extends State<ImportQuizScreen> {
               ),
             ),
           if (it.answer == null)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 4),
               child: Text('No answer found. Tap the correct letter.', style: TextStyle(color: lateAmber, fontSize: 12.5, fontWeight: FontWeight.w600)),
             ),

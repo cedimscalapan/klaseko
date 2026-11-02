@@ -1,7 +1,8 @@
 """Draws the KlaseKo brand images (app icon, adaptive icon layers, splash) into assets/branding/.
 
-The mark: a navy rounded square holding a white answer bubble with a navy check, and a gold
-shaded bubble at the upper right. Drawn at 4x and scaled down for smooth edges.
+The mark: a navy rounded square holding a navy "K" (Lexend ExtraBold) inside a white answer
+bubble, like the lettered bubbles on a test paper, and a gold shaded bubble at the upper right.
+Drawn at 4x and scaled down for smooth edges.
 
 Run from the project folder:  python tool/make_brand_assets.py
 """
@@ -33,24 +34,28 @@ def _gradient_square(size, radius):
     return out
 
 
-def _draw_symbol(img, cx, cy, scale):
-    """Bubble, check and gold dot centred on (cx, cy); scale 1.0 = the 1024 px icon layout."""
+# The "K" of Lexend ExtraBold in font units (y up): upper arm, stem and lower leg.
+LETTER_K = [
+    [223, 201, 161, 355, 500, 700, 728, 700],
+    [83, 0, 83, 700, 281, 700, 281, 0],
+    [526, 0, 270, 336, 400, 448, 753, 0],
+]
+
+
+def _draw_symbol(img, cx, cy, scale, letter=NAVY_DEEP, gold=GOLD):
+    """Bubble, letter K and gold bubble centred on (cx, cy); scale 1.0 = the 1024 px icon layout.
+    letter=None cuts the K out of the bubble (transparent), for single-colour icons."""
     d = ImageDraw.Draw(img)
     s = scale
-    # white answer bubble
-    r = 262 * s
-    bx, by = cx - 40 * s, cy + 30 * s
+    r = 286 * s
+    bx, by = cx - 50 * s, cy + 54 * s
     d.ellipse([bx - r, by - r, bx + r, by + r], fill=WHITE)
-    # navy check mark with rounded ends
-    w = int(66 * s)
-    pts = [(bx - 120 * s, by + 4 * s), (bx - 28 * s, by + 98 * s), (bx + 138 * s, by - 112 * s)]
-    d.line(pts, fill=NAVY_DEEP, width=w, joint="curve")
-    for x, y in (pts[0], pts[2]):
-        d.ellipse([x - w / 2, y - w / 2, x + w / 2, y + w / 2], fill=NAVY_DEEP)
-    # gold shaded bubble
-    gr = 104 * s
-    gx, gy = cx + 236 * s, cy - 236 * s
-    d.ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=GOLD)
+    for shape in LETTER_K:
+        pts = [(bx + (shape[i] - 418) * 0.48 * s, by + (350 - shape[i + 1]) * 0.48 * s) for i in range(0, len(shape), 2)]
+        d.polygon(pts, fill=letter if letter else (0, 0, 0, 0))
+    gr = 100 * s
+    gx, gy = cx + 246 * s, cy - 230 * s
+    d.ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=gold)
 
 
 def _finish(img, size):
@@ -80,12 +85,11 @@ def splash(size, symbol_scale):
 
 
 def monochrome(size=1024):
-    """Single-colour layer for Android 13 themed icons."""
-    fg = adaptive_foreground(size)
-    alpha = fg.split()[3]
-    out = Image.new("RGBA", (size, size), (255, 255, 255, 0))
-    out.putalpha(alpha)
-    return out
+    """Single-colour layer for Android 13 themed icons: the K is cut out of the bubble."""
+    big = size * SS
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    _draw_symbol(img, big / 2, big / 2, big / 1024 * 0.62, letter=None, gold=WHITE)
+    return _finish(img, size)
 
 
 if __name__ == "__main__":

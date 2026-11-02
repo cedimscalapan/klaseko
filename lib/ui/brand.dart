@@ -17,8 +17,9 @@ class Brand {
   static const gold = Color(0xFFD8B567);
 }
 
-/// The logo symbol: a navy rounded square with a white answer bubble, a navy check and a gold
-/// shaded bubble. Matches the app icon (tool/make_brand_assets.py).
+/// The logo symbol: a navy rounded square with a navy "K" inside a white answer bubble, like the
+/// lettered bubbles on a test paper, and one gold shaded bubble. Matches the app icon
+/// (tool/make_brand_assets.py) and assets/branding/klaseko-mark.svg.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 48, this.plain = false});
   final double size;
@@ -50,23 +51,30 @@ class _MarkPainter extends CustomPainter {
     final symbolScale = plain ? 1.12 : 1.0; // the plain mark uses the whole box
     final c = Offset(size.width / 2, size.height / 2);
     double k(double v) => v * s * symbolScale;
-    final bubble = c + Offset(k(-40), k(30));
-    canvas.drawCircle(bubble, k(262), Paint()..color = Colors.white);
-    final check = Path()
-      ..moveTo(bubble.dx + k(-120), bubble.dy + k(4))
-      ..lineTo(bubble.dx + k(-28), bubble.dy + k(98))
-      ..lineTo(bubble.dx + k(138), bubble.dy + k(-112));
-    canvas.drawPath(
-      check,
-      Paint()
-        ..color = Brand.navyDeep
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = k(66)
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-    canvas.drawCircle(c + Offset(k(236), k(-236)), k(104), Paint()..color = Brand.gold);
+    final bubble = c + Offset(k(-50), k(54));
+    canvas.drawCircle(bubble, k(286), Paint()..color = Colors.white);
+    final letter = Path();
+    for (final shape in _letterK) {
+      for (var i = 0; i < shape.length; i += 2) {
+        final p = bubble + Offset(k((shape[i] - 418) * 0.48), k((350 - shape[i + 1]) * 0.48));
+        if (i == 0) {
+          letter.moveTo(p.dx, p.dy);
+        } else {
+          letter.lineTo(p.dx, p.dy);
+        }
+      }
+      letter.close();
+    }
+    canvas.drawPath(letter, Paint()..color = Brand.navyDeep);
+    canvas.drawCircle(c + Offset(k(246), k(-230)), k(100), Paint()..color = Brand.gold);
   }
+
+  /// The "K" of Lexend ExtraBold in font units (y up): upper arm, stem and lower leg.
+  static const _letterK = [
+    [223, 201, 161, 355, 500, 700, 728, 700],
+    [83, 0, 83, 700, 281, 700, 281, 0],
+    [526, 0, 270, 336, 400, 448, 753, 0],
+  ];
 
   @override
   bool shouldRepaint(_MarkPainter old) => old.plain != plain;

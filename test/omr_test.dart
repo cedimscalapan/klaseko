@@ -57,6 +57,10 @@ Uint8List photo({
 
         if (fy > SheetLayout.firstRowY - 4 && fy < SheetLayout.firstRowY + 20 * SheetLayout.rowStep) {
           for (var i = 0; i < answers.length; i++) {
+            // Item number, right-aligned just left of choice A: one 1.6 mm wide digit per character.
+            final lab = SheetLayout.itemLabel(i);
+            final digits = '${i + 1}'.length;
+            if ((fy - lab.y).abs() < 1.3 && fx < lab.x + 2 && fx > lab.x + 2 - 1.6 * digits && ((lab.x + 2 - fx) % 1.6) < 0.4) v = 30;
             for (var c = 0; c < 4; c++) {
               final b = SheetLayout.itemBubble(i, c);
               if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) bubble(b.x, b.y, SheetLayout.bubbleR, 'i$i:$c');
@@ -106,6 +110,43 @@ void main() {
 
   test('reads an upside-down sheet with light pencil', () {
     expectRead(readAnswerSheet(OmrRequest(photo(answers: answers, learnerNum: 53, rotDeg: 183, pencil: 160, seed: 3), 40)), 53);
+  });
+
+  // Close-ups of the answers only: no markers and no learner number in the photo. The photo is
+  // centred on page point (61.95, 141.7) mm, the middle of items 1-10; at 16 px/mm it shows about
+  // 75 x 94 mm of the sheet.
+  final ten = answers.sublist(0, 10);
+  Uint8List closeUp(List<int> a, {double rotDeg = 0, double pxPerMm = 16, int pencil = 45}) {
+    final r = rotDeg * pi / 180, ca = cos(r), sa = sin(r);
+    final u = (-46 * ca - 2 * sa) * pxPerMm, v = (-46 * sa + 2 * ca) * pxPerMm;
+    return photo(answers: a, learnerNum: 0, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, pencil: pencil);
+  }
+
+  void expectCloseUp(OmrResult r) {
+    expect(r.ok, isTrue, reason: r.error);
+    expect(r.learnerNum, isNull);
+    for (var i = 0; i < ten.length; i++) {
+      if (r.review.contains(i)) continue;
+      expect(r.answers[i], ten[i], reason: 'item ${i + 1}');
+    }
+    expect(r.review.length, lessThan(2));
+  }
+
+  test('reads a close-up of the bubbles without markers', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: 4), 10)));
+  });
+
+  test('reads an upside-down close-up with light pencil', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: 181, pencil: 150), 10)));
+  });
+
+  test('reads a sideways close-up', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: -88, pxPerMm: 14), 10)));
+  });
+
+  test('refuses a close-up that leaves out some items', () {
+    final r = readAnswerSheet(OmrRequest(closeUp(answers.sublist(0, 16)), 16));
+    expect(r.ok, isFalse);
   });
 
   test('refuses when answers are outside the photo', () {

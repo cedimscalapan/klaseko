@@ -20,11 +20,12 @@ Never "Klaseko", "Klase Ko", "KLASEKO" or "Klase-Ko".
 | `assets/branding/klaseko-logo-dark.svg` | The same on dark backgrounds |
 | `assets/branding/app_icon.png` | 1024 px app icon |
 
-The symbol is a white **answer bubble** with a navy **check**, beside a gold **shaded bubble**, on a navy rounded square. It says what KlaseKo does: answer sheets, checked.
+The symbol is a navy **K** inside a white **answer bubble**, like the lettered bubbles on a test paper, with one gold **shaded bubble** beside it, on a navy rounded square. It says what KlaseKo does: answer sheets, read and checked. The K is the Lexend ExtraBold letter, the same as in the wordmark.
 
 - Keep clear space around the logo of at least the height of the gold bubble.
 - Do not recolor, stretch, rotate, outline or add shadows to the symbol.
-- On navy backgrounds, use the symbol without its square (white bubble and gold dot only), as on the About screen and the launch screen.
+- On navy backgrounds, use the symbol without its square (the lettered bubble and the gold bubble only), as on the About screen and the launch screen.
+- On single-colour icons (Android themed icons), the K is cut out of the bubble.
 - In the app the logo is drawn in code (`lib/ui/brand.dart`: `BrandMark`, `BrandWordmark`, `BrandLogo`), so it is sharp at every size.
 
 ## Colors

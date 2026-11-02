@@ -6,7 +6,7 @@
     </linearGradient>
   </defs>
   <rect width="1024" height="1024" rx="230" fill="url(#navy)"/>
-  <circle cx="472" cy="542" r="262" fill="#FFFFFF"/>
-  <polyline points="352,546 444,640 610,430" fill="none" stroke="#0F2D57" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="748" cy="276" r="104" fill="#D8B567"/>
+  <circle cx="462" cy="566" r="286" fill="#FFFFFF"/>
+  <path d="M368.4,637.52 338.64,563.6 501.36,398 610.8,398ZM301.2,734 301.2,398 396.24,398 396.24,734ZM513.84,734 390.96,572.72 453.36,518.96 622.8,734Z" fill="#0F2D57"/>
+  <circle cx="758" cy="282" r="100" fill="#D8B567"/>
 </svg>

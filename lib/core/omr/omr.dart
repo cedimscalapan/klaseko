@@ -13,7 +13,8 @@ import 'sheet_layout.dart';
 ///  1. Lighting is flattened (shadows and uneven light removed).
 ///  2. Eight coded markers (corners and edge middles) are found in any rotation. Each one says which
 ///     marker it is and which way is up, so any two visible markers place the whole sheet. Parts of
-///     the paper may be outside the photo as long as every bubble is inside it.
+///     the paper may be outside the photo as long as every bubble is inside it. A close-up with no
+///     markers at all is placed from the grid of bubbles and the item numbers printed beside them.
 ///  3. Each item is locked onto its printed bubble outlines, which corrects small position errors.
 ///     If the outlines are not found where expected, the photo is refused.
 ///  4. Marks are judged against this sheet's own paper level and this learner's own shading, so
@@ -61,9 +62,10 @@ class OmrResult {
   factory OmrResult.fail(String message) => OmrResult(ok: false, error: message);
 }
 
-const _retakeMarkers = 'The answer sheet was not found. Make sure the bubbles and at least two of the black markers are in the photo, in good light, then try again.';
+const _retakeMarkers = 'The answer sheet was not found. Fit all the bubbles and their item numbers in the photo, in good light, then try again.';
+const _retakeGrid = 'The bubbles were found, but not which items they are. Fit all the bubbles and their item numbers in the photo, or include two of the black markers.';
 const _retakeFit = 'The sheet could not be lined up. Keep the paper flat and the phone steady, then try again.';
-const _outsidePhoto = 'Part of the answers is outside the photo. Move the phone back a little so all the bubbles and the learner number are in view.';
+const _outsidePhoto = 'Part of the answers is outside the photo. Move the phone back a little so all the bubbles and their item numbers are in view.';
 const _retakeOutlines = 'The bubbles did not line up with the sheet. Hold the phone straight above the paper, keep it flat, and try again.';
 
 OmrResult readAnswerSheet(OmrRequest req) {
@@ -87,12 +89,18 @@ OmrResult readAnswerSheet(OmrRequest req) {
     }
     final g = _flatten(raw, w, h);
     final thr = _otsu(g);
-    final sheet = _findSheet(g, w, h, thr);
-    final hom = sheet.hom;
-    if (hom == null) return OmrResult.fail(sheet.inconsistent ? _retakeFit : _retakeMarkers);
     final img2 = _Img(g, w, h);
-
     final n = min(req.items, SheetLayout.maxItems);
+    final lab = _label(g, w, h, thr);
+    final sheet = _findSheet(lab, g, w, h, thr);
+    var found = sheet.hom;
+    if (found == null) {
+      // No usable markers: a close-up of the answers. Place the sheet from the bubbles themselves.
+      final grid = _findGrid(lab, img2, w, h, thr, n);
+      found = grid.hom;
+      if (found == null) return OmrResult.fail(grid.error ?? (sheet.inconsistent ? _retakeFit : _retakeMarkers));
+    }
+    final hom = found;
     // Every bubble that will be read must be inside the photo.
     bool inside(Pt p) {
       final q = hom.map(p.x, p.y);
@@ -102,9 +110,8 @@ OmrResult readAnswerSheet(OmrRequest req) {
     for (var i = 0; i < n; i++) {
       if (!inside(SheetLayout.itemBubble(i, 0)) || !inside(SheetLayout.itemBubble(i, SheetLayout.choices - 1))) return OmrResult.fail(_outsidePhoto);
     }
-    for (final col in const [0, 1]) {
-      if (!inside(SheetLayout.idBubble(col, 0)) || !inside(SheetLayout.idBubble(col, 9))) return OmrResult.fail(_outsidePhoto);
-    }
+    // The learner number is read when it is in the photo; otherwise the teacher picks the learner.
+    final idInView = [0, 1].every((col) => inside(SheetLayout.idBubble(col, 0)) && inside(SheetLayout.idBubble(col, 9)));
     final rows = <List<double>>[];
     final ringScores = <double>[];
     final offsets = <double>[];
@@ -144,7 +151,7 @@ OmrResult readAnswerSheet(OmrRequest req) {
       return f.indexOf(m);
     }
 
-    final tens = digit(0), ones = digit(1);
+    final tens = idInView ? digit(0) : null, ones = idInView ? digit(1) : null;
     final learnerNum = (tens == null && ones == null) ? null : (tens ?? 0) * 10 + (ones ?? 0);
 
     return OmrResult(
@@ -448,9 +455,8 @@ class _Sheet {
   _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false});
 }
 
-_Sheet _findSheet(Uint8List g, int w, int h, int thr) {
+_Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr) {
   final area = w * h;
-  final lab = _label(g, w, h, thr);
   final found = <int, _Marker>{};
   for (final b in lab.blobs) {
     if (b.count < area * 0.00006 || b.count > area * 0.02) continue;
@@ -483,6 +489,237 @@ _Sheet _findSheet(Uint8List g, int w, int h, int thr) {
     if (err > 1.5) return _Sheet(null, false, found.length, inconsistent: true);
   }
   return _Sheet(hom, found.length < 3, found.length);
+}
+
+// ---------------------------------------------------------------------------
+// Finding the sheet without markers: the bubble grid and the item numbers
+// ---------------------------------------------------------------------------
+
+class _GridFit {
+  final _Homography? hom;
+  final String? error;
+  _GridFit(this.hom, [this.error]);
+}
+
+/// Places the sheet from a close-up that shows no markers. The bubble outlines (and shaded
+/// bubbles) form a regular grid: four choices across and one row per item. Every way that grid
+/// could sit on the sheet is tried (which way is up, which column of items, which rows), and a
+/// placement is used only when it is the single one where every item's printed outlines are found
+/// where expected and every item number is printed to the left of its row.
+_GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
+  if (n == 0) return _GridFit(null);
+  // 1. Round blobs of one common size: empty outlines and shaded bubbles.
+  final cands = <(double, double, double)>[];
+  for (final b in lab.blobs) {
+    final bw = b.maxX - b.minX + 1, bh = b.maxY - b.minY + 1;
+    if (bw < 10 || bh < 10 || bw > w / 3 || bh > h / 3) continue;
+    final ar = bw / bh;
+    if (ar < 0.7 || ar > 1.43) continue;
+    final fill = b.count / (bw * bh);
+    if (fill < 0.08 || fill > 0.95) continue;
+    if ((b.cx - (b.minX + b.maxX) / 2).abs() > 0.2 * bw || (b.cy - (b.minY + b.maxY) / 2).abs() > 0.2 * bh) continue;
+    cands.add((b.cx, b.cy, (bw + bh) / 2));
+  }
+  var most = 0;
+  var size = 0.0;
+  for (final c in cands) {
+    final k = cands.where((o) => (o.$3 - c.$3).abs() <= 0.15 * c.$3).length;
+    if (k > most) {
+      most = k;
+      size = c.$3;
+    }
+  }
+  final pts = [for (final c in cands) if ((c.$3 - size).abs() <= 0.2 * size) Pt(c.$1, c.$2)];
+  if (pts.length < 8) return _GridFit(null);
+
+  // 2. The grid's two directions and spacings, from the distances between neighbouring bubbles.
+  final angs = <double>[], lens = <double>[];
+  for (final p in pts) {
+    for (final q in pts) {
+      final dx = q.x - p.x, dy = q.y - p.y;
+      final l = sqrt(dx * dx + dy * dy);
+      if (l >= 1.2 * size && l <= 2.3 * size) {
+        angs.add((atan2(dy, dx) * 180 / pi) % 180);
+        lens.add(l);
+      }
+    }
+  }
+  if (angs.isEmpty) return _GridFit(null);
+  final hist = List<double>.filled(180, 0);
+  for (final a in angs) {
+    hist[a.floor() % 180]++;
+  }
+  double smooth(int i) {
+    var s = 0.0;
+    for (var k = -3; k <= 3; k++) {
+      s += hist[(i + k) % 180];
+    }
+    return s;
+  }
+
+  var t1 = 0;
+  for (var i = 1; i < 180; i++) {
+    if (smooth(i) > smooth(t1)) t1 = i;
+  }
+  var t2 = (t1 + 70) % 180;
+  for (var k = -20; k <= 20; k++) {
+    final i = (t1 + 90 + k) % 180;
+    if (smooth(i) > smooth(t2)) t2 = i;
+  }
+  Pt? axis(int t) {
+    final l = <double>[];
+    var d = 0.0;
+    for (var i = 0; i < angs.length; i++) {
+      final off = ((angs[i] - t + 90) % 180) - 90;
+      if (off.abs() > 10) continue;
+      l.add(lens[i]);
+      d += off;
+    }
+    if (l.isEmpty) return null;
+    final a = (t + d / l.length) * pi / 180, len = _median(l);
+    return Pt(len * cos(a), len * sin(a));
+  }
+
+  final ga = axis(t1);
+  var gb = axis(t2);
+  if (ga == null || gb == null) return _GridFit(null);
+  // A photo is never mirrored, so the second direction is always a quarter turn clockwise from the first.
+  if (-ga.y * gb.x + ga.x * gb.y < 0) gb = Pt(-gb.x, -gb.y);
+
+  // 3. Grid positions, grown outwards from bubble to bubble so a tilted or curved page is followed.
+  final coord = <int, (int, int)>{};
+  final comps = <List<int>>[];
+  const steps = [(1, 0), (-1, 0), (0, 1), (0, -1), (2, 0), (-2, 0), (0, 2), (0, -2)];
+  for (var seed = 0; seed < pts.length; seed++) {
+    if (coord.containsKey(seed)) continue;
+    final comp = [seed];
+    final local = <int, (Pt, Pt)>{seed: (ga, gb)};
+    coord[seed] = (0, 0);
+    for (var qi = 0; qi < comp.length; qi++) {
+      final p = comp[qi];
+      final (a, b) = local[p]!;
+      final (k, r) = coord[p]!;
+      final tol = 0.28 * min(sqrt(a.x * a.x + a.y * a.y), sqrt(b.x * b.x + b.y * b.y));
+      for (final (dk, dr) in steps) {
+        final px = pts[p].x + dk * a.x + dr * b.x, py = pts[p].y + dk * a.y + dr * b.y;
+        var q = -1;
+        var dq = tol;
+        for (var j = 0; j < pts.length; j++) {
+          final d = sqrt(pow(pts[j].x - px, 2) + pow(pts[j].y - py, 2));
+          if (d <= dq) {
+            dq = d;
+            q = j;
+          }
+        }
+        if (q < 0 || coord.containsKey(q)) continue;
+        coord[q] = (k + dk, r + dr);
+        final step = Pt(pts[q].x - pts[p].x, pts[q].y - pts[p].y);
+        local[q] = dk != 0 ? (Pt(step.x / dk, step.y / dk), b) : (a, Pt(step.x / dr, step.y / dr));
+        comp.add(q);
+      }
+    }
+    comps.add(comp);
+  }
+  final comp = comps.reduce((a, b) => a.length >= b.length ? a : b);
+  if (comp.length < 8) return _GridFit(null);
+  final ks = [for (final i in comp) coord[i]!.$1], rs = [for (final i in comp) coord[i]!.$2];
+  final kmin = ks.reduce(min), kmax = ks.reduce(max), rmin = rs.reduce(min), rmax = rs.reduce(max);
+  final sk = kmax - kmin + 1, sr = rmax - rmin + 1;
+
+  // 4. Each way the grid can sit on the sheet: (choice, row) of a grid position, and the number of rows.
+  final orients = <((int, int) Function(int, int), int)>[
+    if (sk == SheetLayout.choices) ((int k, int r) => (k - kmin, r - rmin), sr),
+    if (sk == SheetLayout.choices) ((int k, int r) => (kmax - k, rmax - r), sr),
+    if (sr == SheetLayout.choices) ((int k, int r) => (r - rmin, kmax - k), sk),
+    if (sr == SheetLayout.choices) ((int k, int r) => (rmax - r, k - kmin), sk),
+  ];
+  final passed = <_Homography>[];
+  var outside = false;
+  final blocks = (n + SheetLayout.rowsPerColumn - 1) ~/ SheetLayout.rowsPerColumn;
+  for (final (place, rows) in orients) {
+    for (var block = 0; block < blocks; block++) {
+      final rowsIn = min(SheetLayout.rowsPerColumn, n - block * SheetLayout.rowsPerColumn);
+      for (var top = 0; top + rows <= rowsIn; top++) {
+        final src = <Pt>[], dst = <Pt>[];
+        for (final i in comp) {
+          final (c, row) = place(coord[i]!.$1, coord[i]!.$2);
+          src.add(SheetLayout.itemBubble(block * SheetLayout.rowsPerColumn + top + row, c));
+          dst.add(pts[i]);
+        }
+        final hom = _solveHomography(src, dst);
+        if (hom == null || !_fitsWithin(hom, src, dst, 1.2)) continue;
+        if (!_itemsInside(hom, n, w, h)) {
+          outside = true;
+          continue;
+        }
+        // Wrong way up or wrong column: the item numbers are not where this placement expects them.
+        if (_labelsFound(im, hom, n, thr) < n * 0.5) continue;
+        final regs = [
+          for (var i = 0; i < n; i++)
+            _register(im, hom, [for (var c = 0; c < SheetLayout.choices; c++) SheetLayout.itemBubble(i, c)], SheetLayout.bubbleR)
+        ];
+        final scores = [for (final r in regs) r.score];
+        final med = _median(scores);
+        if (med < 0.06 || scores.any((s) => s < med * 0.4) || regs.any((r) => sqrt(r.dx * r.dx + r.dy * r.dy) > 1.25)) continue;
+        // Refit on every item's outlines, then require the item numbers beside the rows.
+        final src2 = <Pt>[], dst2 = <Pt>[];
+        for (var i = 0; i < n; i++) {
+          for (var c = 0; c < SheetLayout.choices; c++) {
+            final b = SheetLayout.itemBubble(i, c);
+            src2.add(b);
+            dst2.add(hom.map(b.x + regs[i].dx, b.y + regs[i].dy));
+          }
+        }
+        final refined = _solveHomography(src2, dst2);
+        if (refined == null || _labelsFound(im, refined, n, thr) < n * 0.8) continue;
+        passed.add(refined);
+      }
+    }
+  }
+  if (passed.length == 1) return _GridFit(passed.first);
+  if (passed.isEmpty && outside) return _GridFit(null, _outsidePhoto);
+  return _GridFit(null, _retakeGrid);
+}
+
+/// True when every point lands within [tolMm] of where the fitted sheet puts it.
+bool _fitsWithin(_Homography hom, List<Pt> src, List<Pt> dst, double tolMm) {
+  for (var i = 0; i < src.length; i++) {
+    final p = hom.map(src[i].x, src[i].y);
+    final e = hom.map(src[i].x + 1, src[i].y);
+    final pxPerMm = sqrt(pow(e.x - p.x, 2) + pow(e.y - p.y, 2));
+    if (pxPerMm == 0 || sqrt(pow(p.x - dst[i].x, 2) + pow(p.y - dst[i].y, 2)) / pxPerMm > tolMm) return false;
+  }
+  return true;
+}
+
+bool _itemsInside(_Homography hom, int n, int w, int h) {
+  for (var i = 0; i < n; i++) {
+    for (final c in const [0, SheetLayout.choices - 1]) {
+      final b = SheetLayout.itemBubble(i, c);
+      final q = hom.map(b.x, b.y);
+      if (q.x < 3 || q.y < 3 || q.x > w - 4 || q.y > h - 4) return false;
+    }
+  }
+  return true;
+}
+
+/// How many items have ink where their printed number should be, just left of choice A.
+int _labelsFound(_Img im, _Homography hom, int n, int thr) {
+  var found = 0;
+  for (var i = 0; i < n; i++) {
+    final at = SheetLayout.itemLabel(i);
+    var dark = 0, total = 0;
+    for (var y = at.y - 1.4; y <= at.y + 1.41; y += 0.25) {
+      for (var x = at.x - 0.8; x <= at.x + 2.21; x += 0.25) {
+        final q = hom.map(x, y);
+        final px = q.x.round(), py = q.y.round();
+        total++;
+        if (px >= 0 && py >= 0 && px < im.w && py < im.h && im.g[py * im.w + px] < thr) dark++;
+      }
+    }
+    if (dark >= total * 0.04) found++;
+  }
+  return found;
 }
 
 /// Projective map from sheet millimetres to image pixels, fitted by least squares on normalised

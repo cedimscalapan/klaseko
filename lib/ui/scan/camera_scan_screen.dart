@@ -184,7 +184,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'No need to line anything up. Get all the bubbles in the photo, any angle, then tap the button.',
+                    _lastError ?? 'No need to line anything up. Get all the bubbles and their item numbers in the photo, any angle, then tap the button.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),

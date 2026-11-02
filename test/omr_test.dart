@@ -149,8 +149,17 @@ void main() {
     expect(r.ok, isFalse);
   });
 
-  test('refuses when answers are outside the photo', () {
+  test('reads the answers when only the learner number is outside the photo', () {
     final r = readAnswerSheet(OmrRequest(photo(answers: answers, learnerNum: 12, pxPerMm: 5.2, dy: -330), 40));
+    expect(r.ok, isTrue, reason: r.error);
+    expect(r.learnerNum, isNull);
+    for (var i = 0; i < answers.length; i++) {
+      if (!r.review.contains(i)) expect(r.answers[i], answers[i], reason: 'item ${i + 1}');
+    }
+  });
+
+  test('refuses when answers are outside the photo', () {
+    final r = readAnswerSheet(OmrRequest(photo(answers: answers, learnerNum: 12, pxPerMm: 5.2, dy: 330), 40));
     expect(r.ok, isFalse);
   });
 }

@@ -176,10 +176,10 @@ class PrintTipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _InfoScreen(title: 'Printing answer sheets', children: [
-        _p('Print at 100% size ("Actual size"), not "Fit to page". The four black corner squares must print fully.'),
+        _p('Print at 100% size ("Actual size"), not "Fit to page". The black markers at the corners and edges must print clearly.'),
         _p('Use the paper size set in your school profile (short, long or A4). Black ink only; grayscale is fine.'),
-        _p('Photocopies work if the corner squares stay dark and sharp. Avoid copies that are too light.'),
-        _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write near the black squares.'),
+        _p('Photocopies work if the markers stay dark and sharp. Avoid copies that are too light.'),
+        _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black markers.'),
         _p('When scanning, lay the sheet flat on a plain table in good light, avoid shadows from your phone, and keep all four squares inside the frame.'),
         _p('If a paper cannot be read, use "Check by tapping" for that learner.'),
       ]);

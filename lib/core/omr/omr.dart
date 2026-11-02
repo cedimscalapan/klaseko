@@ -11,8 +11,9 @@ import 'sheet_layout.dart';
 /// Design goal: never return a wrong answer silently. Every step either reads the sheet with
 /// confidence, flags an item for the teacher to check, or refuses the photo and asks for a retake.
 ///  1. Lighting is flattened (shadows and uneven light removed).
-///  2. The corner squares are found in any rotation; the orientation bar tells top from bottom.
-///     If one corner is hidden, it is estimated, but only trusted if step 3 confirms it exactly.
+///  2. Eight coded markers (corners and edge middles) are found in any rotation. Each one says which
+///     marker it is and which way is up, so any two visible markers place the whole sheet. Parts of
+///     the paper may be outside the photo as long as every bubble is inside it.
 ///  3. Each item is locked onto its printed bubble outlines, which corrects small position errors.
 ///     If the outlines are not found where expected, the photo is refused.
 ///  4. Marks are judged against this sheet's own paper level and this learner's own shading, so
@@ -39,7 +40,7 @@ class OmrResult {
   /// Darkness (0..1) of every bubble, items x 4.
   final List<List<double>> fills;
 
-  /// True when one corner square was hidden and its position was estimated (and then confirmed).
+  /// True when only two markers were visible (the fit was then confirmed on every item).
   final bool estimatedCorner;
 
   /// True when the learner shaded very lightly. Erasures can then be as dark as real answers,
@@ -60,7 +61,9 @@ class OmrResult {
   factory OmrResult.fail(String message) => OmrResult(ok: false, error: message);
 }
 
-const _retakeCorners = 'The sheet was not found clearly. Fit all 4 black corner squares in the frame, keep the paper flat, and try again.';
+const _retakeMarkers = 'The answer sheet was not found. Make sure the bubbles and at least two of the black markers are in the photo, in good light, then try again.';
+const _retakeFit = 'The sheet could not be lined up. Keep the paper flat and the phone steady, then try again.';
+const _outsidePhoto = 'Part of the answers is outside the photo. Move the phone back a little so all the bubbles and the learner number are in view.';
 const _retakeOutlines = 'The bubbles did not line up with the sheet. Hold the phone straight above the paper, keep it flat, and try again.';
 
 OmrResult readAnswerSheet(OmrRequest req) {
@@ -85,11 +88,23 @@ OmrResult readAnswerSheet(OmrRequest req) {
     final g = _flatten(raw, w, h);
     final thr = _otsu(g);
     final sheet = _findSheet(g, w, h, thr);
-    if (sheet == null) return OmrResult.fail(_retakeCorners);
     final hom = sheet.hom;
+    if (hom == null) return OmrResult.fail(sheet.inconsistent ? _retakeFit : _retakeMarkers);
     final img2 = _Img(g, w, h);
 
     final n = min(req.items, SheetLayout.maxItems);
+    // Every bubble that will be read must be inside the photo.
+    bool inside(Pt p) {
+      final q = hom.map(p.x, p.y);
+      return q.x >= 3 && q.y >= 3 && q.x <= w - 4 && q.y <= h - 4;
+    }
+
+    for (var i = 0; i < n; i++) {
+      if (!inside(SheetLayout.itemBubble(i, 0)) || !inside(SheetLayout.itemBubble(i, SheetLayout.choices - 1))) return OmrResult.fail(_outsidePhoto);
+    }
+    for (final col in const [0, 1]) {
+      if (!inside(SheetLayout.idBubble(col, 0)) || !inside(SheetLayout.idBubble(col, 9))) return OmrResult.fail(_outsidePhoto);
+    }
     final rows = <List<double>>[];
     final ringScores = <double>[];
     final offsets = <double>[];
@@ -105,7 +120,7 @@ OmrResult readAnswerSheet(OmrRequest req) {
       final weak = ringScores.where((v) => v < ringMed * 0.4).length;
       if (ringMed < 0.06 || weak > n * 0.15) return OmrResult.fail(_retakeOutlines);
       final drift = offsets.where((d) => d > 1.25).length;
-      if (sheet.estimated && (weak > 0 || drift > 0)) return OmrResult.fail(_retakeCorners);
+      if (sheet.estimated && (weak > 0 || drift > 0)) return OmrResult.fail(_retakeFit);
       if (drift > n * 0.1) return OmrResult.fail(_retakeOutlines);
     }
 
@@ -253,28 +268,35 @@ double _median(List<double> a) {
 }
 
 // ---------------------------------------------------------------------------
-// Finding the sheet
+// Finding the sheet: coded markers
 // ---------------------------------------------------------------------------
 
 class _Blob {
+  final int id;
   int count = 0, minX = 1 << 30, minY = 1 << 30, maxX = -1, maxY = -1;
   double sx = 0, sy = 0;
+  _Blob(this.id);
   double get cx => sx / count;
   double get cy => sy / count;
 }
 
-List<_Blob> _blobs(Uint8List g, int w, int h, int thr) {
+class _Labeled {
+  final Int32List labels;
+  final List<_Blob> blobs;
+  _Labeled(this.labels, this.blobs);
+}
+
+_Labeled _label(Uint8List g, int w, int h, int thr) {
   final labels = Int32List(w * h);
   final stack = Int32List(w * h);
   final blobs = <_Blob>[];
   for (var start = 0; start < w * h; start++) {
     if (labels[start] != 0 || g[start] >= thr) continue;
-    final b = _Blob();
+    final b = _Blob(blobs.length + 1);
     blobs.add(b);
-    final id = blobs.length;
     var sp = 0;
     stack[sp++] = start;
-    labels[start] = id;
+    labels[start] = b.id;
     while (sp > 0) {
       final idx = stack[--sp];
       final x = idx % w, y = idx ~/ w;
@@ -286,212 +308,251 @@ List<_Blob> _blobs(Uint8List g, int w, int h, int thr) {
       if (y < b.minY) b.minY = y;
       if (y > b.maxY) b.maxY = y;
       if (x > 0 && labels[idx - 1] == 0 && g[idx - 1] < thr) {
-        labels[idx - 1] = id;
+        labels[idx - 1] = b.id;
         stack[sp++] = idx - 1;
       }
       if (x < w - 1 && labels[idx + 1] == 0 && g[idx + 1] < thr) {
-        labels[idx + 1] = id;
+        labels[idx + 1] = b.id;
         stack[sp++] = idx + 1;
       }
       if (y > 0 && labels[idx - w] == 0 && g[idx - w] < thr) {
-        labels[idx - w] = id;
+        labels[idx - w] = b.id;
         stack[sp++] = idx - w;
       }
       if (y < h - 1 && labels[idx + w] == 0 && g[idx + w] < thr) {
-        labels[idx + w] = id;
+        labels[idx + w] = b.id;
         stack[sp++] = idx + w;
       }
     }
   }
-  return blobs;
+  return _Labeled(labels, blobs);
 }
 
-class _Sheet {
-  final _Homography hom;
-  final double score;
-  final bool estimated;
-  _Sheet(this.hom, this.score, this.estimated);
+List<Pt> _clockwise(List<Pt> pts) {
+  final cx = pts.fold<double>(0, (a, p) => a + p.x) / pts.length;
+  final cy = pts.fold<double>(0, (a, p) => a + p.y) / pts.length;
+  return [...pts]..sort((a, b) => atan2(a.y - cy, a.x - cx).compareTo(atan2(b.y - cy, b.x - cx)));
 }
 
-class _Cand {
-  final Pt p;
-  final int? area; // null for an estimated corner
-  _Cand(this.p, this.area);
-}
-
-const _frame = [Pt(0, 0), Pt(SheetLayout.frameW, 0), Pt(SheetLayout.frameW, SheetLayout.frameH), Pt(0, SheetLayout.frameH)];
-
-double _polyArea(List<Pt> q) {
-  var a = 0.0;
-  for (var j = 0; j < q.length; j++) {
-    final p1 = q[j], p2 = q[(j + 1) % q.length];
-    a += p1.x * p2.y - p2.x * p1.y;
-  }
-  return a.abs() / 2;
-}
-
-List<_Cand> _clockwise(List<_Cand> pts) {
-  final cx = pts.fold<double>(0, (a, p) => a + p.p.x) / pts.length;
-  final cy = pts.fold<double>(0, (a, p) => a + p.p.y) / pts.length;
-  return [...pts]..sort((a, b) => atan2(a.p.y - cy, a.p.x - cx).compareTo(atan2(b.p.y - cy, b.p.x - cx)));
-}
-
-List<Pt> _rectPoints(double x0, double y0, double x1, double y1) {
+/// Four corners of a square-ish blob: the boundary point farthest from the centre, the point
+/// farthest from that one, then the farthest points on each side of that diagonal.
+List<Pt>? _quadCorners(Int32List labels, int w, _Blob b) {
   final pts = <Pt>[];
-  for (var y = y0; y <= y1; y += 0.5) {
-    for (var x = x0; x <= x1; x += 0.8) {
-      pts.add(Pt(x, y));
+  for (var y = b.minY; y <= b.maxY; y++) {
+    for (var x = b.minX; x <= b.maxX; x++) {
+      final i = y * w + x;
+      if (labels[i] != b.id) continue;
+      if (labels[i - 1] != b.id || labels[i + 1] != b.id || labels[i - w] != b.id || labels[i + w] != b.id) {
+        pts.add(Pt(x.toDouble(), y.toDouble()));
+      }
     }
   }
-  return pts;
-}
-
-final _barPts = _rectPoints(SheetLayout.barX0, SheetLayout.barY0, SheetLayout.barX1, SheetLayout.barY1);
-final _barMirrorPts = _rectPoints(SheetLayout.frameW - SheetLayout.barX1, SheetLayout.frameH - SheetLayout.barY1,
-    SheetLayout.frameW - SheetLayout.barX0, SheetLayout.frameH - SheetLayout.barY0);
-
-double _fillPts(Uint8List g, int w, int h, int thr, _Homography hom, List<Pt> pts) {
-  var dark = 0, total = 0;
+  if (pts.length < 8) return null;
+  final cx = b.cx, cy = b.cy;
+  var p1 = pts.first;
+  var d = -1.0;
   for (final p in pts) {
-    final q = hom.map(p.x, p.y);
-    final x = q.x.round(), y = q.y.round();
-    if (x < 0 || y < 0 || x >= w || y >= h) continue;
-    total++;
-    if (g[y * w + x] < thr) dark++;
-  }
-  return total == 0 ? 0 : dark / total;
-}
-
-/// Scores one assignment of image points to the sheet corners (tl, tr, br, bl).
-_Sheet? _scoreQuad(Uint8List g, int w, int h, int thr, List<_Cand> quad, bool estimated) {
-  final hom = _tryHomography([for (final c in quad) c.p]);
-  if (hom == null) return null;
-  var sizeErr = 0.0;
-  const half = SheetLayout.marker / 2;
-  for (var i = 0; i < 4; i++) {
-    final area = quad[i].area;
-    if (area == null) continue;
-    final c = _frame[i];
-    final expected = _polyArea([
-      hom.map(c.x - half, c.y - half),
-      hom.map(c.x + half, c.y - half),
-      hom.map(c.x + half, c.y + half),
-      hom.map(c.x - half, c.y + half),
-    ]);
-    if (expected <= 0) return null;
-    final r = area / expected;
-    if (r < 0.45 || r > 2.0) return null;
-    sizeErr += log(r).abs();
-  }
-  final bar = _fillPts(g, w, h, thr, hom, _barPts);
-  final mirror = _fillPts(g, w, h, thr, hom, _barMirrorPts);
-  if (bar < 0.55 || mirror > 0.35) return null;
-  final score = bar - mirror - sizeErr * 0.2 - (estimated ? 0.3 : 0);
-  return _Sheet(hom, score, estimated);
-}
-
-_Sheet? _findSheet(Uint8List g, int w, int h, int thr) {
-  final area = w * h;
-  final blobs = _blobs(g, w, h, thr).where((b) {
-    if (b.count < area * 0.00008 || b.count > area * 0.015) return false;
-    final bw = b.maxX - b.minX + 1, bh = b.maxY - b.minY + 1;
-    final ar = bw / bh;
-    return ar > 0.5 && ar < 2 && b.count / (bw * bh) >= 0.5;
-  }).toList()
-    ..sort((a, b) => b.count.compareTo(a.count));
-  final cands = [for (final b in blobs.take(12)) _Cand(Pt(b.cx, b.cy), b.count)];
-
-  _Sheet? best;
-  void tryQuad(List<_Cand> ordered, bool estimated) {
-    for (var r = 0; r < 4; r++) {
-      final quad = [for (var k = 0; k < 4; k++) ordered[(k + r) % 4]];
-      final s = _scoreQuad(g, w, h, thr, quad, estimated);
-      if (s != null && (best == null || s.score > best!.score)) best = s;
+    final v = (p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy);
+    if (v > d) {
+      d = v;
+      p1 = p;
     }
   }
-
-  // Four real corner squares.
-  for (var a = 0; a < cands.length; a++) {
-    for (var b = a + 1; b < cands.length; b++) {
-      for (var c = b + 1; c < cands.length; c++) {
-        for (var d = c + 1; d < cands.length; d++) {
-          final ordered = _clockwise([cands[a], cands[b], cands[c], cands[d]]);
-          if (_polyArea([for (final o in ordered) o.p]) < area * 0.08) continue;
-          tryQuad(ordered, false);
-        }
-      }
+  var p3 = p1;
+  d = -1;
+  for (final p in pts) {
+    final v = (p.x - p1.x) * (p.x - p1.x) + (p.y - p1.y) * (p.y - p1.y);
+    if (v > d) {
+      d = v;
+      p3 = p;
     }
   }
-  if (best != null) return best;
+  Pt? p2, p4;
+  var dp = 0.0, dn = 0.0;
+  for (final p in pts) {
+    final v = (p3.x - p1.x) * (p.y - p1.y) - (p3.y - p1.y) * (p.x - p1.x);
+    if (v > dp) {
+      dp = v;
+      p2 = p;
+    }
+    if (v < dn) {
+      dn = v;
+      p4 = p;
+    }
+  }
+  if (p2 == null || p4 == null) return null;
+  return _clockwise([p1, p2, p3, p4]);
+}
 
-  // Three corner squares: estimate the hidden one (parallelogram). It is only accepted later if
-  // every item's printed outlines line up exactly.
-  for (var a = 0; a < cands.length; a++) {
-    for (var b = a + 1; b < cands.length; b++) {
-      for (var c = b + 1; c < cands.length; c++) {
-        final tri = [cands[a], cands[b], cands[c]];
-        for (var k = 0; k < 3; k++) {
-          final m = tri[k], o1 = tri[(k + 1) % 3], o2 = tri[(k + 2) % 3];
-          final fourth = _Cand(Pt(o1.p.x + o2.p.x - m.p.x, o1.p.y + o2.p.y - m.p.y), null);
-          final ordered = _clockwise([m, o1, fourth, o2]);
-          if (_polyArea([for (final o in ordered) o.p]) < area * 0.08) continue;
-          tryQuad(ordered, true);
+class _Marker {
+  final int id;
+  final List<Pt> corners; // image points for the marker's own TL, TR, BR, BL
+  final int dist;
+  _Marker(this.id, this.corners, this.dist);
+}
+
+const _unitSquare = [Pt(0, 0), Pt(6, 0), Pt(6, 6), Pt(0, 6)];
+
+/// Reads a candidate quad as a coded marker, trying its four possible starting corners.
+_Marker? _decodeMarker(Uint8List g, int w, int h, int thr, List<Pt> quad) {
+  _Marker? best;
+  for (var s = 0; s < 4; s++) {
+    final q = [for (var k = 0; k < 4; k++) quad[(k + s) % 4]];
+    final hm = _solveHomography(_unitSquare, q);
+    if (hm == null) continue;
+    double cell(int r, int c) {
+      var dark = 0, t = 0;
+      for (final oy in const [0.3, 0.5, 0.7]) {
+        for (final ox in const [0.3, 0.5, 0.7]) {
+          final p = hm.map(c + ox, r + oy);
+          final x = p.x.round(), y = p.y.round();
+          if (x < 0 || y < 0 || x >= w || y >= h) return -1;
+          t++;
+          if (g[y * w + x] < thr) dark++;
         }
       }
+      return dark / t;
+    }
+
+    var border = 0.0;
+    for (var i = 0; i < 6; i++) {
+      for (final rc in [(0, i), (5, i), (i, 0), (i, 5)]) {
+        final v = cell(rc.$1, rc.$2);
+        if (v < 0) return null;
+        border += v;
+      }
+    }
+    if (border / 24 < 0.75) return null;
+    final bits = <int>[];
+    for (var r = 1; r <= 4; r++) {
+      for (var c = 1; c <= 4; c++) {
+        bits.add(cell(r, c) >= 0.5 ? 1 : 0);
+      }
+    }
+    for (var id = 0; id < SheetLayout.markerCodes.length; id++) {
+      var dist = 0;
+      for (var i = 0; i < 16; i++) {
+        if (bits[i] != (SheetLayout.markerBit(id, i ~/ 4, i % 4) ? 1 : 0)) dist++;
+      }
+      if (dist <= 2 && (best == null || dist < best.dist)) best = _Marker(id, q, dist);
     }
   }
   return best;
 }
 
-_Homography? _tryHomography(List<Pt> dst) {
-  try {
-    return _Homography.fromFrame(dst);
-  } catch (_) {
-    return null;
+class _Sheet {
+  final _Homography? hom;
+  final bool estimated;
+  final int markers;
+  final bool inconsistent;
+  _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false});
+}
+
+_Sheet _findSheet(Uint8List g, int w, int h, int thr) {
+  final area = w * h;
+  final lab = _label(g, w, h, thr);
+  final found = <int, _Marker>{};
+  for (final b in lab.blobs) {
+    if (b.count < area * 0.00006 || b.count > area * 0.02) continue;
+    if (b.minX <= 0 || b.minY <= 0 || b.maxX >= w - 1 || b.maxY >= h - 1) continue;
+    final bw = b.maxX - b.minX + 1, bh = b.maxY - b.minY + 1;
+    final ar = bw / bh;
+    if (ar < 0.4 || ar > 2.5 || b.count / (bw * bh) < 0.35) continue;
+    final quad = _quadCorners(lab.labels, w, b);
+    if (quad == null) continue;
+    final m = _decodeMarker(g, w, h, thr, quad);
+    if (m != null && (found[m.id] == null || m.dist < found[m.id]!.dist)) found[m.id] = m;
+  }
+  if (found.length < 2) return _Sheet(null, false, found.length);
+
+  const half = SheetLayout.marker / 2;
+  final src = <Pt>[], dst = <Pt>[];
+  found.forEach((id, m) {
+    final c = SheetLayout.markerCenters[id];
+    src.addAll([Pt(c.x - half, c.y - half), Pt(c.x + half, c.y - half), Pt(c.x + half, c.y + half), Pt(c.x - half, c.y + half)]);
+    dst.addAll(m.corners);
+  });
+  final hom = _solveHomography(src, dst);
+  if (hom == null) return _Sheet(null, false, found.length);
+  // Every marker corner must land within 1.5 mm of where the fitted sheet puts it.
+  for (var i = 0; i < src.length; i++) {
+    final p = hom.map(src[i].x, src[i].y);
+    final e = hom.map(src[i].x + 1, src[i].y);
+    final pxPerMm = sqrt(pow(e.x - p.x, 2) + pow(e.y - p.y, 2));
+    final err = sqrt(pow(p.x - dst[i].x, 2) + pow(p.y - dst[i].y, 2)) / pxPerMm;
+    if (err > 1.5) return _Sheet(null, false, found.length, inconsistent: true);
+  }
+  return _Sheet(hom, found.length < 3, found.length);
+}
+
+/// Projective map from sheet millimetres to image pixels, fitted by least squares on normalised
+/// points (works for exactly 4 points and for many).
+class _Homography {
+  final List<double> h;
+  final double sx0, sy0, ss, dx0, dy0, ds;
+  _Homography(this.h, this.sx0, this.sy0, this.ss, this.dx0, this.dy0, this.ds);
+
+  Pt map(double x, double y) {
+    final nx = (x - sx0) * ss, ny = (y - sy0) * ss;
+    final d = h[6] * nx + h[7] * ny + 1;
+    final u = (h[0] * nx + h[1] * ny + h[2]) / d, v = (h[3] * nx + h[4] * ny + h[5]) / d;
+    return Pt(u / ds + dx0, v / ds + dy0);
   }
 }
 
-class _Homography {
-  final List<double> h;
-  _Homography(this.h);
-
-  /// Maps sheet millimetres (frame space) to image pixels.
-  factory _Homography.fromFrame(List<Pt> dst) {
-    final a = List.generate(8, (_) => List<double>.filled(9, 0));
-    for (var i = 0; i < 4; i++) {
-      final sx = _frame[i].x, sy = _frame[i].y, dx = dst[i].x, dy = dst[i].y;
-      a[2 * i] = [sx, sy, 1, 0, 0, 0, -dx * sx, -dx * sy, dx];
-      a[2 * i + 1] = [0, 0, 0, sx, sy, 1, -dy * sx, -dy * sy, dy];
+_Homography? _solveHomography(List<Pt> src, List<Pt> dst) {
+  (double, double, double) norm(List<Pt> pts) {
+    final cx = pts.fold<double>(0, (a, p) => a + p.x) / pts.length;
+    final cy = pts.fold<double>(0, (a, p) => a + p.y) / pts.length;
+    var d = 0.0;
+    for (final p in pts) {
+      d += sqrt((p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy));
     }
-    for (var col = 0; col < 8; col++) {
-      var pivot = col;
-      for (var r = col + 1; r < 8; r++) {
-        if (a[r][col].abs() > a[pivot][col].abs()) pivot = r;
+    d /= pts.length;
+    return (cx, cy, d == 0 ? 1.0 : sqrt2 / d);
+  }
+
+  final (scx, scy, ss) = norm(src);
+  final (dcx, dcy, ds) = norm(dst);
+  final m = List.generate(8, (_) => List<double>.filled(9, 0));
+  void addRow(List<double> row, double rhs) {
+    for (var r = 0; r < 8; r++) {
+      for (var c = 0; c < 8; c++) {
+        m[r][c] += row[r] * row[c];
       }
-      final tmp = a[col];
-      a[col] = a[pivot];
-      a[pivot] = tmp;
-      final pv = a[col][col];
-      if (pv.abs() < 1e-12) throw StateError('Corner points are not usable.');
+      m[r][8] += row[r] * rhs;
+    }
+  }
+
+  for (var i = 0; i < src.length; i++) {
+    final x = (src[i].x - scx) * ss, y = (src[i].y - scy) * ss;
+    final u = (dst[i].x - dcx) * ds, v = (dst[i].y - dcy) * ds;
+    addRow([x, y, 1, 0, 0, 0, -u * x, -u * y], u);
+    addRow([0, 0, 0, x, y, 1, -v * x, -v * y], v);
+  }
+  for (var col = 0; col < 8; col++) {
+    var pivot = col;
+    for (var r = col + 1; r < 8; r++) {
+      if (m[r][col].abs() > m[pivot][col].abs()) pivot = r;
+    }
+    final tmp = m[col];
+    m[col] = m[pivot];
+    m[pivot] = tmp;
+    final pv = m[col][col];
+    if (pv.abs() < 1e-12) return null;
+    for (var c = col; c < 9; c++) {
+      m[col][c] /= pv;
+    }
+    for (var r = 0; r < 8; r++) {
+      if (r == col) continue;
+      final f = m[r][col];
+      if (f == 0) continue;
       for (var c = col; c < 9; c++) {
-        a[col][c] /= pv;
-      }
-      for (var r = 0; r < 8; r++) {
-        if (r == col) continue;
-        final f = a[r][col];
-        if (f == 0) continue;
-        for (var c = col; c < 9; c++) {
-          a[r][c] -= f * a[col][c];
-        }
+        m[r][c] -= f * m[col][c];
       }
     }
-    return _Homography([for (var i = 0; i < 8; i++) a[i][8]]);
   }
-
-  Pt map(double x, double y) {
-    final d = h[6] * x + h[7] * y + 1;
-    return Pt((h[0] * x + h[1] * y + h[2]) / d, (h[3] * x + h[4] * y + h[5]) / d);
-  }
+  return _Homography([for (var i = 0; i < 8; i++) m[i][8]], scx, scy, ss, dcx, dcy, ds);
 }
 
 // ---------------------------------------------------------------------------
@@ -619,12 +680,12 @@ _Classified _classify(List<List<double>> rows) {
       // A mark far darker than this learner's usual marks may be an erasure or a correction: show it too.
       final unusual = markLevel > 0 && top > markLevel * 2.2;
       answers.add(order[0]);
-      flag = second > top * 0.45 || top < level * 0.55 || secondMarked || light || unusual;
+      flag = second > top * 0.45 || top < level * 0.65 || secondMarked || light || unusual;
     } else {
       answers.add(-2);
       flag = true;
     }
     if (flag) review.add(i);
   }
-  return _Classified(answers, review, lightMarks: answered.isNotEmpty && markLevel < 0.25);
+  return _Classified(answers, review, lightMarks: answered.isNotEmpty && markLevel < 0.35);
 }

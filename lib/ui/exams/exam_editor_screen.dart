@@ -5,6 +5,7 @@ import '../../core/models.dart';
 import '../../core/omr/sheet_layout.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'import_quiz_screen.dart';
 
 /// Edit the questions and the answer key. The answer key alone is enough for checking papers;
 /// questions and choices are only needed to print the test paper.
@@ -36,6 +37,17 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
   }
 
   ExamItem _blank() => ExamItem(id: newId(), examId: widget.exam.id, idx: _items.length);
+
+  Future<void> _import() async {
+    final added = await push<List<ExamItem>>(context, ImportQuizScreen(exam: widget.exam, existingCount: _items.length));
+    if (added == null || added.isEmpty || !mounted) return;
+    setState(() {
+      _items.addAll(added);
+      _keyOnly = false;
+      _dirty = true;
+    });
+    toast(context, 'Added ${added.length} items. Check them, then tap Save.', success: true);
+  }
 
   void _add([int count = 1]) {
     if (_items.length + count > SheetLayout.maxItems) {
@@ -72,6 +84,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
         appBar: AppBar(
           title: Text('${_items.length} items'),
           actions: [
+            IconButton(tooltip: 'Import from a file, photo or text', icon: const Icon(Icons.file_download_outlined), onPressed: _import),
             TextButton(
               onPressed: () async {
                 final nav = Navigator.of(context);
@@ -101,6 +114,16 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                if (_items.isEmpty) ...[
+                  NavRow(
+                    icon: Icons.file_download_rounded,
+                    title: 'Import an existing quiz',
+                    subtitle: 'From a photo, Word, PDF or pasted text. Questions, choices and the answer key are filled in for you.',
+                    highlight: true,
+                    onTap: _import,
+                  ),
+                  const Center(child: Text('or start from blank items', style: TextStyle(fontSize: 13))),
+                ],
                 if (_items.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),

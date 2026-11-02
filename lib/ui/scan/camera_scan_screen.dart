@@ -10,7 +10,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/db.dart';
 import '../../core/models.dart';
 import '../../core/omr/omr.dart';
-import '../../core/omr/sheet_layout.dart';
 import '../exams/exam_detail_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -167,19 +166,6 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
               child: Text(_cameraError ?? 'Starting the camera...', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
             ),
           ),
-        // Guide: corner brackets where the four black squares should go. The sheet does not need to
-        // match the guide exactly; any angle works as long as all four squares are in the photo.
-        IgnorePointer(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(26),
-              child: AspectRatio(
-                aspectRatio: (SheetLayout.frameW + 24) / (SheetLayout.frameH + 24),
-                child: CustomPaint(painter: _GuidePainter(color: _lastError == null ? Colors.white : const Color(0xFFFFB74D))),
-              ),
-            ),
-          ),
-        ),
         Positioned(
           left: 16,
           right: 16,
@@ -198,7 +184,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'Lay the sheet flat in good light. Keep all 4 black squares in view, then tap the button.',
+                    _lastError ?? 'No need to line anything up. Get all the bubbles in the photo, any angle, then tap the button.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),
@@ -267,37 +253,6 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
         ]),
       );
-}
-
-class _GuidePainter extends CustomPainter {
-  _GuidePainter({required this.color});
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = color
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final l = size.shortestSide * 0.12;
-    final r = Rect.fromLTWH(0, 0, size.width, size.height);
-    for (final (corner, dx, dy) in [
-      (r.topLeft, 1.0, 1.0),
-      (r.topRight, -1.0, 1.0),
-      (r.bottomLeft, 1.0, -1.0),
-      (r.bottomRight, -1.0, -1.0),
-    ]) {
-      canvas.drawLine(corner, corner.translate(l * dx, 0), p);
-      canvas.drawLine(corner, corner.translate(0, l * dy), p);
-      // Small square showing where the printed marker should sit.
-      canvas.drawRect(Rect.fromCenter(center: corner.translate(dx * l * 0.35, dy * l * 0.35), width: l * 0.28, height: l * 0.28),
-          Paint()..color = color.withAlpha(90));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GuidePainter old) => old.color != color;
 }
 
 /// Shows what the scanner read. Items the reader is unsure about must be confirmed or corrected

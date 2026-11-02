@@ -13,6 +13,7 @@ Offline class records, exam maker and paper checker for DepEd teachers. Flutter 
 | Attendance | Present / Late / Absent in one tap, mark all present, clear holidays, monthly SF2 |
 | Class record | Written Work, Performance Tasks, Examinations (ST1 30%, ST2 30%, Term Exam 40%), automatic PS, WS, initial grade, transmutation, term and final grades, overrides, letter grades for Grade 1 |
 | Exams | Multiple choice and true/false items, answer-key-only mode, competencies, test paper PDF, answer key PDF, personalized or blank answer sheets |
+| Quiz import | Bring in an existing quiz from a photo, a Word (.docx) or PDF file, or pasted text. Questions, choices and the answer key are found automatically (answer key sections, "Answer: B" lines, starred or bold answers, Tama/Mali sections); the teacher checks and adds them. Offline (on-device text recognition). |
 | Checking | Phone-camera scanning (offline), review and correct before saving, check by tapping, scores flow into the class record |
 | Analysis | MPS, mastery level, mean, SD, difficulty, discrimination, retain/revise/reject, distractor counts, least-mastered competencies |
 | Forms and files | SF1 (Excel), SF2 (PDF and Excel), SF9 report cards (PDF), class record (Excel), summary of grades (PDF), item analysis (PDF and Excel) |
@@ -77,7 +78,7 @@ tool/                           setup and platform patch scripts
 The goal is that a wrong answer is never saved silently: each photo is either read with confidence, flagged item by item for the teacher, or refused with a retake message.
 
 1. **Lighting is flattened.** A paper-brightness map (80th percentile per 32 px cell) removes shadows and uneven light.
-2. **The sheet is found at any angle.** The four corner squares are found among the largest solid blobs and tried in every rotation; the orientation bar tells top from bottom, and each square must be the size a 9 mm square would be at that spot. If one square is hidden (a finger, a fold), its position is estimated, but only trusted if step 3 confirms it exactly.
+2. **No need to line up the sheet.** Eight coded markers (corners and the middle of each edge) each carry a small pattern that names the marker and shows which way is up, so any two visible markers place the whole sheet, at any angle. Parts of the paper may be outside the photo or under a finger, as long as every bubble and the learner number are in view. Sheets printed before version 3 must be reprinted.
 3. **Each item locks onto its printed circles.** The reader shifts each row by up to 2 mm to line up with the printed bubble outlines, which corrects bent paper and small position errors. If the outlines are not where they should be, the photo is refused.
 4. **Marks are judged against this sheet and this learner.** Paper level and noise come from each item's lightest bubbles, and the mark line adapts to how dark the learner shades, so light pencil and small dots are read.
 5. **Doubt is flagged, not guessed.** Faint marks, erasures, two marks in one item, stray dots and marks that stand out but fall under the line are highlighted. The teacher must confirm or correct them before the paper can be saved.

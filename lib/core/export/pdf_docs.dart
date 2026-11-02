@@ -92,14 +92,21 @@ Future<Uint8List> buildAnswerSheets({
   for (final target in targets) {
     final l = target.learner;
     final children = <pw.Widget>[];
-    // Corner markers
-    for (final c in [Pt(0, 0), Pt(SheetLayout.frameW, 0), Pt(0, SheetLayout.frameH), Pt(SheetLayout.frameW, SheetLayout.frameH)]) {
-      children.add(at(c.x - SheetLayout.marker / 2, c.y - SheetLayout.marker / 2,
-          pw.Container(width: SheetLayout.marker * mm, height: SheetLayout.marker * mm, color: PdfColors.black)));
+    // Coded markers: black border plus a 4 x 4 pattern that names each marker.
+    const cell = SheetLayout.markerCell;
+    for (var id = 0; id < SheetLayout.markerCenters.length; id++) {
+      final c = SheetLayout.markerCenters[id];
+      final x0 = c.x - SheetLayout.marker / 2, y0 = c.y - SheetLayout.marker / 2;
+      children.add(at(x0, y0, pw.Container(width: SheetLayout.marker * mm, height: SheetLayout.marker * mm, color: PdfColors.white)));
+      for (var r = 0; r < 6; r++) {
+        for (var col = 0; col < 6; col++) {
+          final border = r == 0 || col == 0 || r == 5 || col == 5;
+          if (!border && !SheetLayout.markerBit(id, r - 1, col - 1)) continue;
+          // Slight overlap so neighbouring black cells print as one solid area.
+          children.add(at(x0 + col * cell, y0 + r * cell, pw.Container(width: (cell + 0.05) * mm, height: (cell + 0.05) * mm, color: PdfColors.black)));
+        }
+      }
     }
-    // Orientation bar
-    children.add(at(SheetLayout.barX0, SheetLayout.barY0,
-        pw.Container(width: (SheetLayout.barX1 - SheetLayout.barX0) * mm, height: (SheetLayout.barY1 - SheetLayout.barY0) * mm, color: PdfColors.black)));
 
     // Header
     children.add(at(
@@ -128,7 +135,7 @@ Future<Uint8List> buildAnswerSheets({
             pw.Expanded(child: _line('Score', '')),
           ]),
           pw.SizedBox(height: 6),
-          _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold or write near the black squares.', size: 6.5, color: PdfColors.grey700),
+          _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold or write on the black markers.', size: 6.5, color: PdfColors.grey700),
         ]),
       ),
     ));

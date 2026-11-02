@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'exam_editor_screen.dart';
 import 'exams_screen.dart';
+import 'import_quiz_screen.dart';
 import 'item_analysis_screen.dart';
 
 class ExamBundle {
@@ -51,6 +52,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         if (b != null && mounted) push(context, ExamEditorScreen(exam: b.exam));
       });
     }
+  }
+
+  Future<void> _import(ExamBundle b) async {
+    final added = await push<List<ExamItem>>(context, ImportQuizScreen(exam: b.exam, existingCount: b.items.length));
+    if (added == null || added.isEmpty) return;
+    await store.repo.saveItems(b.exam.id, [...b.items, ...added]);
+    store.changed();
+    if (mounted) toast(context, 'Added ${added.length} items to ${b.exam.title}.', success: true);
   }
 
   void _printSheets(ExamBundle b) {
@@ -173,6 +182,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             _step(Icons.edit_note, ready ? 'Edit items and answer key' : 'Add items and answer key', ready ? '${b.items.length} items' : 'Required before printing and checking',
                 () => push(context, ExamEditorScreen(exam: b.exam)),
                 highlight: !ready),
+            _step(Icons.file_download_outlined, 'Import questions', 'From a photo, Word, PDF or pasted text', () => _import(b), color: teal),
             _step(Icons.article_outlined, 'Print test paper', 'PDF of the questions for learners', () => _printTest(b)),
             _step(Icons.grading_outlined, 'Print answer sheets', 'Bubble sheets that the camera can read', () => _printSheets(b)),
             _step(Icons.key_outlined, 'Print answer key', 'For your file', () => _printTest(b, key: true)),

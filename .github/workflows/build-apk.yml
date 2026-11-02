@@ -28,7 +28,9 @@ jobs:
           set -o pipefail
           flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
       - name: Unit tests
-        run: flutter test
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee test.log
       - name: Build APK
         run: |
           set -o pipefail
@@ -39,6 +41,7 @@ jobs:
         run: |
           touch errs.txt
           [ -f analyze.log ] && grep -E "^\s*error " analyze.log | head -60 >> errs.txt || true
+          [ -f test.log ] && grep -E "\[E\]|Expected:|Actual:|Which:|Error:|error:" test.log | head -60 >> errs.txt || true
           [ -f build.log ] && grep -i -E "error|what went wrong|failed|exception|could not|cannot|unresolved|requires|> " build.log | grep -v "^\s*$" | tail -90 >> errs.txt || true
           [ -s errs.txt ] || exit 0
           split -l 30 errs.txt part_

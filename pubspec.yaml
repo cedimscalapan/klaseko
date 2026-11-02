@@ -25,6 +25,9 @@ dependencies:
   # Files
   share_plus: ^10.0.2
   file_picker: ^8.1.2
+  # Quiz import: Word files (zip) and on-device text recognition for photos and PDF pages
+  archive: ^3.6.1
+  google_mlkit_text_recognition: '>=0.13.0 <0.18.0'
   # Utilities
   intl: ^0.19.0
   uuid: ^4.5.0

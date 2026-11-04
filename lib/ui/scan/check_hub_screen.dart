@@ -7,7 +7,7 @@ import '../exams/exams_screen.dart';
 import '../exams/item_analysis_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'camera_scan_screen.dart';
+import 'scan_roster_screen.dart';
 
 class _HubRow {
   final Exam exam;
@@ -111,7 +111,7 @@ class CheckHubScreen extends StatelessWidget {
                     else
                       FilledButton.icon(
                         style: FilledButton.styleFrom(minimumSize: const Size(40, 40)),
-                        onPressed: () => push(context, CameraScanScreen(examId: r.exam.id)),
+                        onPressed: () => push(context, ScanRosterScreen(examId: r.exam.id)),
                         icon: const Icon(Icons.document_scanner_outlined, size: 18),
                         label: const Text('Scan'),
                       ),

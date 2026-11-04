@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/db.dart';
 import '../../core/export/form_data.dart';
 import '../../core/models.dart';
 import '../attendance/attendance_screen.dart';
@@ -17,7 +18,10 @@ class _Detail {
   final Map<String, String> today;
   final int exams;
   final int activities;
-  _Detail(this.cls, this.learners, this.today, this.exams, this.activities);
+
+  /// Another class of this section that already has its class list.
+  final SchoolClass? listFrom;
+  _Detail(this.cls, this.learners, this.today, this.exams, this.activities, this.listFrom);
 }
 
 class ClassDetailScreen extends StatelessWidget {
@@ -29,13 +33,33 @@ class ClassDetailScreen extends StatelessWidget {
     final cls = await repo.classById(classId);
     if (cls == null) return null;
     final today = dayKey(DateTime.now());
+    final learners = await repo.learners(classId);
+    SchoolClass? listFrom;
+    if (learners.isEmpty) {
+      for (final other in await sectionClasses(repo, cls)) {
+        if ((await repo.learners(other.id)).isNotEmpty) {
+          listFrom = other;
+          break;
+        }
+      }
+    }
     return _Detail(
       cls,
-      await repo.learners(classId),
+      learners,
       (await repo.attendance(classId, from: today, to: today))[today] ?? {},
       (await repo.exams(classId: classId)).length,
       (await repo.activities(classId)).length,
+      listFrom,
     );
+  }
+
+  Future<void> _copyList(BuildContext context, SchoolClass c, SchoolClass from) async {
+    final source = (await store.repo.learners(from.id)).where((l) => l.isActive);
+    for (final l in source) {
+      await store.repo.saveLearner(Learner.fromMap({...l.toMap(), 'id': newId(), 'class_id': c.id}));
+    }
+    store.changed();
+    if (context.mounted) toast(context, 'Class list added from ${from.subject}.', success: true);
   }
 
   Future<void> _delete(BuildContext context, SchoolClass c) async {
@@ -91,6 +115,15 @@ class ClassDetailScreen extends StatelessWidget {
             ),
             if (d.learners.isEmpty) ...[
               const SizedBox(height: 14),
+              if (d.listFrom != null)
+                NavRow(
+                  icon: Icons.group_add_rounded,
+                  title: 'Use the class list from ${d.listFrom!.subject}',
+                  subtitle: 'The same section, already entered',
+                  highlight: true,
+                  color: goodGreen,
+                  onTap: () => _copyList(context, c, d.listFrom!),
+                ),
               NavRow(
                 icon: Icons.person_add_alt_1_rounded,
                 title: 'Start here: add your learners',

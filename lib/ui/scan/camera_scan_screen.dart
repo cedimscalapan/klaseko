@@ -21,8 +21,14 @@ import 'answer_grid.dart';
 /// Point the camera at a KlaseKo answer sheet, take the photo, review, save, repeat.
 /// Reading happens on the phone in a background isolate; no internet is used.
 class CameraScanScreen extends StatefulWidget {
-  const CameraScanScreen({super.key, required this.examId});
+  const CameraScanScreen({super.key, required this.examId, this.learnerId, this.inOrder = false});
   final String examId;
+
+  /// Whose paper this is, when the teacher chose the name first. Otherwise the learner number decides.
+  final String? learnerId;
+
+  /// Goes down the class list: after each saved paper, the next learner without a score.
+  final bool inOrder;
 
   @override
   State<CameraScanScreen> createState() => _CameraScanScreenState();
@@ -35,16 +41,21 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
   bool _busy = false;
   bool _flash = false;
   String? _lastError;
+  String? _saved;
+  String? _target;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _target = widget.learnerId;
     _init();
   }
 
   Future<void> _init() async {
     _b = await loadExamBundle(widget.examId);
+    final unchecked = _b?.unchecked ?? const <Learner>[];
+    if (widget.inOrder && unchecked.isNotEmpty) _target = unchecked.first.id;
     try {
       final cams = await availableCameras();
       if (cams.isEmpty) throw CameraException('none', 'No camera found on this phone.');
@@ -95,6 +106,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
     setState(() {
       _busy = true;
       _lastError = null;
+      _saved = null;
     });
     final result = await compute(readAnswerSheet, OmrRequest(bytes, b.items.length));
     if (!mounted) return;
@@ -105,9 +117,64 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
       return;
     }
     HapticFeedback.mediumImpact();
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScanReviewScreen(bundle: b, result: result)));
+    final target = _target;
+    final byNumber = result.learnerNum == null ? const <Learner>[] : b.learners.where((l) => l.num == result.learnerNum).toList();
+    final lid = target ?? (byNumber.isEmpty ? null : byNumber.first.id);
+    final otherNumber = target != null && result.learnerNum != null && !byNumber.any((l) => l.id == target);
+    final blanks = result.answers.where((a) => a == ansBlank).length;
+    // A clear reading goes straight to the record. Anything the teacher should see first goes to the
+    // result screen: unsure marks, a sheet numbered for someone else, a mostly blank sheet.
+    final clear = lid != null && !otherNumber && result.review.isEmpty && !result.lightMarks && blanks * 2 <= result.answers.length && (target != null || !b.responses.containsKey(lid));
+    if (lid != null && clear) {
+      final answers = List.generate(b.items.length, (i) => i < result.answers.length ? result.answers[i] : ansBlank);
+      final score = scoreAnswers(b.items, answers);
+      await store.repo.saveResponse(ExamResponse(examId: b.exam.id, learnerId: lid, answers: answers, score: score, source: 'scan', updated: now()));
+      store.changed();
+      await _afterSaved(lid, score);
+      return;
+    }
+    final saved = await push<(String, int)>(context, ScanReviewScreen(bundle: b, result: result, learnerId: target));
+    if (saved != null) {
+      await _afterSaved(saved.$1, saved.$2);
+    } else {
+      _b = await loadExamBundle(widget.examId);
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Tells the teacher the score is in the class record, then moves on.
+  Future<void> _afterSaved(String learnerId, int score) async {
+    final name = _b!.learners.firstWhere((l) => l.id == learnerId).fullName;
+    final message = '$name: $score/${_b!.items.length} recorded';
+    HapticFeedback.mediumImpact();
     _b = await loadExamBundle(widget.examId);
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (widget.learnerId != null) {
+      toast(context, message, success: true);
+      Navigator.pop(context);
+      return;
+    }
+    if (widget.inOrder) {
+      final left = _b?.unchecked ?? const <Learner>[];
+      if (left.isEmpty) {
+        toast(context, '$message. All papers are checked.', success: true);
+        Navigator.pop(context);
+        return;
+      }
+      _target = left.first.id;
+    }
+    setState(() => _saved = message);
+  }
+
+  void _skip() {
+    final left = _b?.unchecked ?? const <Learner>[];
+    if (left.isEmpty) return;
+    final at = left.indexWhere((l) => l.id == _target);
+    setState(() {
+      _target = left[(at + 1) % left.length].id;
+      _saved = null;
+      _lastError = null;
+    });
   }
 
   Future<void> _shoot() async {
@@ -128,7 +195,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
   }
 
   Future<void> _enterByHand() async {
-    await push(context, ManualCheckScreen(examId: widget.examId));
+    await push(context, ManualCheckScreen(examId: widget.examId, learnerId: _target));
     _b = await loadExamBundle(widget.examId);
     if (mounted) setState(() => _lastError = null);
   }
@@ -145,14 +212,19 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
     final checked = b == null ? 0 : b.responses.length;
     final total = b?.learners.length ?? 0;
     final cam = _cam;
+    final hits = b == null ? const <Learner>[] : b.learners.where((l) => l.id == _target).toList();
+    final targeted = hits.isEmpty ? null : hits.first;
+    final layout = store.profile.sheetSize == 'quarter' && (b?.items.length ?? 0) <= BoxLayout.quarter.maxItems ? BoxLayout.quarter : BoxLayout.full;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-        title: Text(b?.exam.title ?? 'Scan papers'),
+        title: Text(targeted?.fullName ?? b?.exam.title ?? 'Scan papers'),
         actions: [
+          if (widget.inOrder && (b?.unchecked.length ?? 0) > 1)
+            TextButton(onPressed: _skip, style: TextButton.styleFrom(foregroundColor: Colors.white), child: const Text('Skip')),
           if (cam != null)
             IconButton(
               tooltip: 'Flashlight',
@@ -179,8 +251,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
           IgnorePointer(
             child: CustomPaint(
               painter: _ScanGuide(
-                (SheetLayout.areaRight(b.items.length) + SheetLayout.areaMarker) /
-                    (SheetLayout.areaBottom(b.items.length) - SheetLayout.areaTop + SheetLayout.areaMarker),
+                (layout.right(b.items.length) + layout.marker) / (layout.bottom(b.items.length) - layout.top + layout.marker),
               ),
             ),
           ),
@@ -194,15 +265,15 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
               key: ValueKey(_lastError),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: _lastError == null ? Colors.black.withAlpha(150) : const Color(0xE6B07400),
+                color: _lastError != null ? const Color(0xE6B07400) : _saved != null ? const Color(0xE62B7348) : Colors.black.withAlpha(150),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(children: [
-                Icon(_lastError == null ? Icons.lightbulb_outline_rounded : Icons.refresh_rounded, color: Colors.white, size: 20),
+                Icon(_lastError != null ? Icons.refresh_rounded : _saved != null ? Icons.check_circle_rounded : Icons.lightbulb_outline_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'Fit the answer box inside the corners. It does not have to be exact, and any angle works.',
+                    _lastError ?? _saved ?? 'Fit the answer box inside the corners. It does not have to be exact, and any angle works.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),
@@ -315,9 +386,12 @@ class _ScanGuide extends CustomPainter {
 /// Shows what the scanner read. Items the reader is unsure about must be confirmed or corrected
 /// before saving, so an uncertain mark never becomes a score without the teacher seeing it.
 class ScanReviewScreen extends StatefulWidget {
-  const ScanReviewScreen({super.key, required this.bundle, required this.result});
+  const ScanReviewScreen({super.key, required this.bundle, required this.result, this.learnerId});
   final ExamBundle bundle;
   final OmrResult result;
+
+  /// The learner the teacher chose before scanning.
+  final String? learnerId;
 
   @override
   State<ScanReviewScreen> createState() => _ScanReviewScreenState();
@@ -339,7 +413,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
     _onlyToCheck = _toCheck.isNotEmpty;
     final num = widget.result.learnerNum;
     final matches = num == null ? const <Learner>[] : b.learners.where((l) => l.num == num).toList();
-    _lid = matches.isNotEmpty ? matches.first.id : (b.unchecked.length == 1 ? b.unchecked.first.id : null);
+    _lid = widget.learnerId ?? (matches.isNotEmpty ? matches.first.id : (b.unchecked.length == 1 ? b.unchecked.first.id : null));
   }
 
   Future<void> _save() async {
@@ -358,7 +432,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
       toast(context, 'This paper was shaded lightly. Compare it with the answers below, then tick the box.');
       return;
     }
-    if (b.responses.containsKey(lid)) {
+    if (b.responses.containsKey(lid) && widget.learnerId == null) {
       final name = b.learners.firstWhere((l) => l.id == lid).fullName;
       final ok = await confirm(context, title: 'Replace the saved paper?', message: '$name already has a checked paper for this exam.', action: 'Replace', danger: false);
       if (!ok) return;
@@ -366,11 +440,7 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
     final score = scoreAnswers(b.items, _answers);
     await store.repo.saveResponse(ExamResponse(examId: b.exam.id, learnerId: lid, answers: [..._answers], score: score, source: 'scan', updated: now()));
     store.changed();
-    HapticFeedback.mediumImpact();
-    if (mounted) {
-      toast(context, 'Saved $score/${b.items.length}. Scan the next paper.', success: true);
-      Navigator.pop(context);
-    }
+    if (mounted) Navigator.pop(context, (lid, score));
   }
 
   @override
@@ -413,6 +483,8 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(_lid == null ? 'Whose paper is this?' : b.learners.firstWhere((l) => l.id == _lid).fullName, style: Theme.of(context).textTheme.titleMedium),
+                if (numRead != null && _lid != null && !unmatched && b.learners.firstWhere((l) => l.id == _lid).num != numRead)
+                  Text('This sheet is shaded as learner no. ${two(numRead)}. Check that this is the right paper.', style: TextStyle(color: penRed, fontSize: 13)),
                 if (unmatched) Text('No learner has number ${two(numRead ?? 0)}. Choose below.', style: TextStyle(color: penRed, fontSize: 13)),
                 const SizedBox(height: 4),
                 Row(children: [

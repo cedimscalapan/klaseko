@@ -365,3 +365,50 @@ Uint8List buildItemAnalysisXlsx(SchoolProfile p, SchoolClass cls, Exam exam, Exa
   b.width(1, 30);
   return b.bytes();
 }
+
+/// School Form 5: Report on Promotion and Level of Proficiency.
+Uint8List buildSf5Xlsx(Sf5Data d) {
+  final b = _Book()..addSheet('SF5');
+  const heads = ['LRN', "LEARNER'S NAME", 'GENERAL AVERAGE', 'ACTION TAKEN', 'LEARNING AREAS BELOW 75'];
+  _header(b, 'School Form 5 (SF5) Report on Promotion and Level of Proficiency', d.profile, d.cls, heads.length - 1);
+  const r0 = 6;
+  for (var c = 0; c < heads.length; c++) {
+    b.put(c, r0, heads[c], bold: true, center: true, border: true, wrap: true, size: 9);
+  }
+  var r = r0 + 1;
+  for (final sex in const ['M', 'F']) {
+    b.put(1, r, sex == 'M' ? 'MALE' : 'FEMALE', bold: true, border: true);
+    r++;
+    for (final row in d.rows.where((x) => x.learner.sex == sex)) {
+      b.put(0, r, row.learner.lrn, border: true);
+      b.put(1, r, row.learner.fullName, border: true);
+      b.put(2, r, int.tryParse(row.generalAverage ?? '') ?? row.generalAverage, center: true, border: true);
+      b.put(3, r, row.action, center: true, border: true);
+      b.put(4, r, row.belowPassing.join(', '), border: true, wrap: true);
+      r++;
+    }
+  }
+  r++;
+  for (final (title, counts) in [('SUMMARY', d.actions), ('LEVEL OF PROFICIENCY', d.levels)]) {
+    b.put(1, r, title, bold: true, border: true);
+    b.put(2, r, 'MALE', bold: true, center: true, border: true);
+    b.put(3, r, 'FEMALE', bold: true, center: true, border: true);
+    b.put(4, r, 'TOTAL', bold: true, center: true, border: true);
+    r++;
+    for (final c in counts) {
+      b.put(1, r, c.label, border: true);
+      b.put(2, r, c.male, center: true, border: true);
+      b.put(3, r, c.female, center: true, border: true);
+      b.put(4, r, c.total, center: true, border: true);
+      r++;
+    }
+    r++;
+  }
+  b.width(0, 16);
+  b.width(1, 36);
+  b.width(2, 12);
+  b.width(3, 24);
+  b.width(4, 34);
+  return b.bytes();
+}
+

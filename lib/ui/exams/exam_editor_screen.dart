@@ -6,6 +6,7 @@ import '../../core/omr/sheet_layout.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'import_quiz_screen.dart';
+import 'question_bank_screen.dart';
 
 /// Edit the questions and the answer key. The answer key alone is enough for checking papers;
 /// questions and choices are only needed to print the test paper.
@@ -51,6 +52,20 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
       _dirty = true;
     });
     toast(context, 'Added ${added.length} items. Check them, then tap Save.', success: true);
+  }
+
+  Future<void> _fromBank() async {
+    final added = await push<List<ExamItem>>(
+      context,
+      QuestionBankScreen(exam: widget.exam, startAt: _items.length, room: SheetLayout.maxItems - _items.length),
+    );
+    if (added == null || added.isEmpty || !mounted) return;
+    setState(() {
+      _items.addAll(added);
+      _keyOnly = false;
+      _dirty = true;
+    });
+    toast(context, 'Added ${added.length} from the question bank. Tap Save when ready.', success: true);
   }
 
   void _add([int count = 1]) {
@@ -107,6 +122,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
         appBar: AppBar(
           title: Text('${_items.length} items'),
           actions: [
+            IconButton(tooltip: 'Question bank', icon: const Icon(Icons.library_books_outlined), onPressed: _fromBank),
             IconButton(tooltip: 'Import from a file, photo or text', icon: const Icon(Icons.file_download_outlined), onPressed: _import),
             TextButton(
               onPressed: () async {
@@ -143,6 +159,12 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                     subtitle: 'From a photo, Word, PDF or pasted text. Questions, choices and the answer key are filled in for you.',
                     highlight: true,
                     onTap: _import,
+                  ),
+                  NavRow(
+                    icon: Icons.library_books_rounded,
+                    title: 'Reuse from your question bank',
+                    subtitle: 'Every question from your past exams, kept automatically.',
+                    onTap: _fromBank,
                   ),
                   const Center(child: Text('or start from blank items', style: TextStyle(fontSize: 13))),
                   const SizedBox(height: 8),

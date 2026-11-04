@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'core/store.dart';
 import 'ui/onboarding_screen.dart';
+import 'ui/settings/app_lock.dart';
 import 'ui/shell.dart';
 import 'ui/theme.dart';
 
@@ -37,7 +38,7 @@ class KlaseKoApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: themeModeOf(AppStore.instance.profile.themeMode),
-        builder: (context, child) => PaletteScope(brightness: Theme.of(context).brightness, child: child ?? const SizedBox()),
+        builder: (context, child) => PaletteScope(brightness: Theme.of(context).brightness, child: LockGate(child: child ?? const SizedBox())),
         home: AppStore.instance.onboarded ? const Shell() : const OnboardingScreen(),
       ),
     );

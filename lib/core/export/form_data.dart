@@ -211,6 +211,16 @@ List<(int, int)> schoolMonths(String sy) {
   return [for (var m = 6; m <= 12; m++) (start, m), for (var m = 1; m <= 4; m++) (start + 1, m)];
 }
 
+/// The other classes of the same section: a teacher handling several subjects, or an adviser whose
+/// co-teacher's class is on this phone.
+Future<List<SchoolClass>> sectionClasses(Repo repo, SchoolClass cls) async {
+  String section(SchoolClass c) => c.section.trim().toLowerCase();
+  return [for (final c in await repo.classes()) if (c.id != cls.id && c.grade == cls.grade && section(c) == section(cls) && c.sy == cls.sy) c];
+}
+
+/// Finds the same learner in another class of the section: by LRN, or else by name.
+String learnerKey(Learner l) => l.lrn.trim().isNotEmpty ? l.lrn.trim() : '${l.last.trim().toLowerCase()}|${l.first.trim().toLowerCase()}';
+
 Future<List<Sf9Data>> buildSf9Data(Repo repo, SchoolProfile profile, SchoolClass cls, List<Learner> learners, List<String> areaNames) async {
   final att = await repo.attendance(cls.id);
   final extra = await repo.sf9Grades(learners.map((l) => l.id).toList());
@@ -218,6 +228,11 @@ Future<List<Sf9Data>> buildSf9Data(Repo repo, SchoolProfile profile, SchoolClass
   final months = schoolMonths(profile.sy);
   final syStart = int.tryParse(profile.sy.split('-').first) ?? DateTime.now().year;
   final out = <Sf9Data>[];
+  final bySubject = <String, (GradeEngine, Map<String, String>)>{};
+  for (final c in await sectionClasses(repo, cls)) {
+    final e = GradeEngine(c, await repo.activities(c.id), await repo.scores(c.id), overrides: await repo.overrides(c.id));
+    bySubject[c.subject.trim().toLowerCase()] = (e, {for (final other in await repo.learners(c.id)) learnerKey(other): other.id});
+  }
 
   for (final l in learners) {
     final monthRows = <MonthAttendance>[];
@@ -248,6 +263,17 @@ Future<List<Sf9Data>> buildSf9Data(Repo repo, SchoolProfile profile, SchoolClass
           if (d.isNotEmpty) terms[t] = d;
         }
         fin = ownFinal.partial ? null : (ownFinal.finalGrade?.toString() ?? ownFinal.letter);
+      } else {
+        final source = bySubject[name.toLowerCase()];
+        final otherId = source?.$2[learnerKey(l)];
+        if (source != null && otherId != null) {
+          final f = source.$1.finalGrade(otherId, profile.terms);
+          for (var t = 1; t <= profile.terms; t++) {
+            final d = f.terms[t - 1].display;
+            if (d.isNotEmpty) terms[t] = d;
+          }
+          fin = f.partial ? null : (f.finalGrade?.toString() ?? f.letter);
+        }
       }
       final saved = extra[l.id]?[name];
       if (saved != null) {
@@ -289,3 +315,54 @@ Future<List<Sf9Data>> buildSf9Data(Repo repo, SchoolProfile profile, SchoolClass
   }
   return out;
 }
+
+class Sf5Row {
+  final Learner learner;
+  final String? generalAverage;
+  final String action;
+  final List<String> belowPassing;
+  Sf5Row(this.learner, this.generalAverage, this.action, this.belowPassing);
+}
+
+/// One line of an SF5 summary, with male, female and total counts.
+class Sf5Count {
+  final String label;
+  final int male;
+  final int female;
+  Sf5Count(this.label, this.male, this.female);
+  int get total => male + female;
+}
+
+class Sf5Data {
+  final SchoolProfile profile;
+  final SchoolClass cls;
+  final List<Sf5Row> rows;
+  final List<Sf5Count> actions;
+  final List<Sf5Count> levels;
+  Sf5Data(this.profile, this.cls, this.rows, this.actions, this.levels);
+}
+
+/// School Form 5, built entirely from the report card data.
+Future<Sf5Data> buildSf5Data(Repo repo, SchoolProfile profile, SchoolClass cls, List<String> areaNames) async {
+  final learners = (await repo.learners(cls.id)).where((l) => l.isActive).toList();
+  final cards = await buildSf9Data(repo, profile, cls, learners, areaNames);
+  final rows = [
+    for (final c in cards)
+      Sf5Row(c.learner, c.generalAverage, c.promotion, [
+        for (final a in c.areas)
+          if (!a.isComponent && (int.tryParse(a.finalGrade ?? '') ?? 100) < 75) a.name.trim(),
+      ]),
+  ];
+  Sf5Count count(String label, bool Function(Sf5Row) test) =>
+      Sf5Count(label, rows.where((r) => r.learner.sex == 'M' && test(r)).length, rows.where((r) => r.learner.sex == 'F' && test(r)).length);
+  final actions = [for (final a in const ['Promoted', 'For Summer Remedial Class', 'Retained']) count(a, (r) => r.action == a)];
+  final levels = [
+    for (final (label, sample) in [for (final g in const [95, 85, 77, 70, 60]) (descriptor(g, legacy: cls.legacyRules), g)])
+      count(label, (r) {
+        final ga = int.tryParse(r.generalAverage ?? '');
+        return ga != null && descriptor(ga, legacy: cls.legacyRules) == descriptor(sample, legacy: cls.legacyRules);
+      }),
+  ];
+  return Sf5Data(profile, cls, rows, actions, levels);
+}
+

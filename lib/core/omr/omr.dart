@@ -95,12 +95,15 @@ OmrResult readAnswerSheet(OmrRequest req) {
     final lab = _label(g, w, h, thr);
     final sheet = _findSheet(lab, g, w, h, thr, n);
     var found = sheet.hom;
+    var layout = sheet.box ?? BoxLayout.full;
     if (found == null) {
       // No usable markers: a close-up of the answers. Place the sheet from the bubbles themselves.
       final grid = _findGrid(lab, img2, w, h, thr, n);
       found = grid.hom;
       if (found == null) return OmrResult.fail(grid.error ?? (sheet.inconsistent ? _retakeFit : _retakeMarkers));
+      layout = grid.box ?? layout;
     }
+    if (n > layout.maxItems) return OmrResult.fail('This answer sheet has room for ${layout.maxItems} items, but the exam has $n. Print full-page sheets for this exam.');
     final hom = found;
     // Every bubble that will be read must be inside the photo.
     bool inside(Pt p) {
@@ -109,21 +112,21 @@ OmrResult readAnswerSheet(OmrRequest req) {
     }
 
     for (var i = 0; i < n; i++) {
-      if (!inside(SheetLayout.itemBubble(i, 0)) || !inside(SheetLayout.itemBubble(i, SheetLayout.choices - 1))) return OmrResult.fail(_outsidePhoto);
+      if (!inside(layout.item(i, 0)) || !inside(layout.item(i, SheetLayout.choices - 1))) return OmrResult.fail(_outsidePhoto);
     }
     // The learner number is read when it is in the photo; otherwise the teacher picks the learner.
     // Only version 3 markers mean the number is at the top right; otherwise it is in the answer box.
-    Pt idAt(int col, int d) => sheet.hom != null && !sheet.answerBox ? SheetLayout.idBubble(col, d) : SheetLayout.areaIdBubble(col, d);
+    Pt idAt(int col, int d) => sheet.hom != null && sheet.box == null ? SheetLayout.idBubble(col, d) : layout.id(col, d);
     final idInView = [0, 1].every((col) => inside(idAt(col, 0)) && inside(idAt(col, 9)));
     final rows = <List<double>>[];
     final ringScores = <double>[];
     final offsets = <double>[];
     for (var i = 0; i < n; i++) {
-      final centers = [for (var c = 0; c < SheetLayout.choices; c++) SheetLayout.itemBubble(i, c)];
-      final reg = _register(img2, hom, centers, SheetLayout.bubbleR);
+      final centers = [for (var c = 0; c < SheetLayout.choices; c++) layout.item(i, c)];
+      final reg = _register(img2, hom, centers, layout.bubbleR);
       ringScores.add(reg.score);
       offsets.add(sqrt(reg.dx * reg.dx + reg.dy * reg.dy));
-      rows.add([for (final c in centers) _darknessAt(img2, hom, c.x + reg.dx, c.y + reg.dy, SheetLayout.bubbleR)]);
+      rows.add([for (final c in centers) _darknessAt(img2, hom, c.x + reg.dx, c.y + reg.dy, layout.bubbleR)]);
     }
     if (n > 0) {
       final ringMed = _median(ringScores);
@@ -146,8 +149,8 @@ OmrResult readAnswerSheet(OmrRequest req) {
     // Learner number: each digit column is registered and read like an item with 10 choices.
     int? digit(int col) {
       final centers = [for (var d = 0; d < 10; d++) idAt(col, d)];
-      final reg = _register(img2, hom, centers, SheetLayout.idR);
-      final f = [for (final c in centers) _darknessAt(img2, hom, c.x + reg.dx, c.y + reg.dy, SheetLayout.idR)];
+      final reg = _register(img2, hom, centers, layout.idR);
+      final f = [for (final c in centers) _darknessAt(img2, hom, c.x + reg.dx, c.y + reg.dy, layout.idR)];
       final sorted = [...f]..sort((a, b) => b.compareTo(a));
       final m = sorted.first;
       if (m <= 0.15 || sorted[1] >= m * 0.6) return null;
@@ -456,9 +459,9 @@ class _Sheet {
   final int markers;
   final bool inconsistent;
 
-  /// The markers found are the answer box markers of a version 4 sheet.
-  final bool answerBox;
-  _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false, this.answerBox = false});
+  /// The answer box the markers belong to; null for the outer markers of a version 3 sheet.
+  final BoxLayout? box;
+  _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false, this.box});
 }
 
 _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr, int items) {
@@ -475,16 +478,24 @@ _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr, int items) {
     final m = _decodeMarker(g, w, h, thr, quad);
     if (m != null && (found[m.id] == null || m.dist < found[m.id]!.dist)) found[m.id] = m;
   }
-  final boxMarkers = found.keys.where((id) => id >= SheetLayout.areaCodeStart).length;
-  final answerBox = boxMarkers * 2 >= found.length && boxMarkers > 0;
-  found.removeWhere((id, _) => (id >= SheetLayout.areaCodeStart) != answerBox);
+  // Codes come in sets of eight: version 3, then each answer box size. Use the set seen most.
+  final seen = List<int>.filled(3, 0);
+  for (final id in found.keys) {
+    seen[id ~/ 8]++;
+  }
+  var set = 2;
+  for (final s in const [1, 0]) {
+    if (seen[s] > seen[set]) set = s;
+  }
+  found.removeWhere((id, _) => id ~/ 8 != set);
   if (found.length < 2) return _Sheet(null, false, found.length);
 
-  final half = (answerBox ? SheetLayout.areaMarker : SheetLayout.marker) / 2;
-  final centers = answerBox ? SheetLayout.areaMarkerCenters(items) : SheetLayout.markerCenters;
+  final box = set == 0 ? null : BoxLayout.all[set - 1];
+  final half = (box?.marker ?? SheetLayout.marker) / 2;
+  final centers = box?.markers(items) ?? SheetLayout.markerCenters;
   final src = <Pt>[], dst = <Pt>[];
   found.forEach((id, m) {
-    final c = centers[answerBox ? id - SheetLayout.areaCodeStart : id];
+    final c = centers[id % 8];
     src.addAll([Pt(c.x - half, c.y - half), Pt(c.x + half, c.y - half), Pt(c.x + half, c.y + half), Pt(c.x - half, c.y + half)]);
     dst.addAll(m.corners);
   });
@@ -498,7 +509,7 @@ _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr, int items) {
     final err = sqrt(pow(p.x - dst[i].x, 2) + pow(p.y - dst[i].y, 2)) / pxPerMm;
     if (err > 1.5) return _Sheet(null, false, found.length, inconsistent: true);
   }
-  return _Sheet(hom, found.length < 3, found.length, answerBox: answerBox);
+  return _Sheet(hom, found.length < 3, found.length, box: box);
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +519,8 @@ _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr, int items) {
 class _GridFit {
   final _Homography? hom;
   final String? error;
-  _GridFit(this.hom, [this.error]);
+  final BoxLayout? box;
+  _GridFit(this.hom, [this.error, this.box]);
 }
 
 /// Places the sheet from a photo of just the bubbles. Their outlines (and shaded bubbles) form a
@@ -647,62 +659,74 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
   final kmin = ks.reduce(min), kmax = ks.reduce(max), rmin = rs.reduce(min), rmax = rs.reduce(max);
   final sk = kmax - kmin + 1, sr = rmax - rmin + 1;
 
-  // 4. Each way the grid can sit on the sheet: (choice, row) of a grid position, and the number of rows.
-  final orients = <((int, int) Function(int, int), int)>[
-    if (sk == SheetLayout.choices) ((int k, int r) => (k - kmin, r - rmin), sr),
-    if (sk == SheetLayout.choices) ((int k, int r) => (kmax - k, rmax - r), sr),
-    if (sr == SheetLayout.choices) ((int k, int r) => (r - rmin, kmax - k), sk),
-    if (sr == SheetLayout.choices) ((int k, int r) => (rmax - r, k - kmin), sk),
-  ];
-  final passed = <_Homography>[];
-  var outside = false;
-  final blocks = (n + SheetLayout.rowsPerColumn - 1) ~/ SheetLayout.rowsPerColumn;
-  for (final (place, rows) in orients) {
-    for (var block = 0; block < blocks; block++) {
-      final rowsIn = min(SheetLayout.rowsPerColumn, n - block * SheetLayout.rowsPerColumn);
-      for (var top = 0; top + rows <= rowsIn; top++) {
-        final src = <Pt>[], dst = <Pt>[];
-        for (final i in comp) {
-          final (c, row) = place(coord[i]!.$1, coord[i]!.$2);
-          src.add(SheetLayout.itemBubble(block * SheetLayout.rowsPerColumn + top + row, c));
-          dst.add(pts[i]);
-        }
-        final hom = _fitSkippingStrays(src, dst, 1.2);
-        if (hom == null) continue;
-        if (!_itemsInside(hom, n, w, h)) {
-          outside = true;
-          continue;
-        }
-        final regs = [
-          for (var i = 0; i < n; i++)
-            _register(im, hom, [for (var c = 0; c < SheetLayout.choices; c++) SheetLayout.itemBubble(i, c)], SheetLayout.bubbleR)
-        ];
-        final scores = [for (final r in regs) r.score];
-        final med = _median(scores);
-        if (med < 0.06 || scores.any((s) => s < med * 0.4) || regs.any((r) => sqrt(r.dx * r.dx + r.dy * r.dy) > 1.25)) continue;
-        // Refit on every item's outlines.
-        final src2 = <Pt>[], dst2 = <Pt>[];
-        for (var i = 0; i < n; i++) {
-          for (var c = 0; c < SheetLayout.choices; c++) {
-            final b = SheetLayout.itemBubble(i, c);
-            src2.add(b);
-            dst2.add(hom.map(b.x + regs[i].dx, b.y + regs[i].dy));
+  // 4. Each way the grid can sit on a sheet of each size.
+  _GridFit tryBox(BoxLayout box) {
+    // 4. Each way the grid can sit on the sheet: (choice, row) of a grid position, and the number of rows.
+    final orients = <((int, int) Function(int, int), int)>[
+      if (sk == SheetLayout.choices) ((int k, int r) => (k - kmin, r - rmin), sr),
+      if (sk == SheetLayout.choices) ((int k, int r) => (kmax - k, rmax - r), sr),
+      if (sr == SheetLayout.choices) ((int k, int r) => (r - rmin, kmax - k), sk),
+      if (sr == SheetLayout.choices) ((int k, int r) => (rmax - r, k - kmin), sk),
+    ];
+    final passed = <_Homography>[];
+    var outside = false;
+    final blocks = box.columnsFor(n);
+    for (final (place, rows) in orients) {
+      for (var block = 0; block < blocks; block++) {
+        final rowsIn = min(box.rowsPerColumn, n - block * box.rowsPerColumn);
+        for (var top = 0; top + rows <= rowsIn; top++) {
+          final src = <Pt>[], dst = <Pt>[];
+          for (final i in comp) {
+            final (c, row) = place(coord[i]!.$1, coord[i]!.$2);
+            src.add(box.item(block * box.rowsPerColumn + top + row, c));
+            dst.add(pts[i]);
           }
+          final hom = _fitSkippingStrays(src, dst, 1.2);
+          if (hom == null) continue;
+          if (!_itemsInside(hom, box, n, w, h)) {
+            outside = true;
+            continue;
+          }
+          final regs = [
+            for (var i = 0; i < n; i++)
+              _register(im, hom, [for (var c = 0; c < SheetLayout.choices; c++) box.item(i, c)], box.bubbleR)
+          ];
+          final scores = [for (final r in regs) r.score];
+          final med = _median(scores);
+          if (med < 0.06 || scores.any((s) => s < med * 0.4) || regs.any((r) => sqrt(r.dx * r.dx + r.dy * r.dy) > 1.25)) continue;
+          // Refit on every item's outlines.
+          final src2 = <Pt>[], dst2 = <Pt>[];
+          for (var i = 0; i < n; i++) {
+            for (var c = 0; c < SheetLayout.choices; c++) {
+              final b = box.item(i, c);
+              src2.add(b);
+              dst2.add(hom.map(b.x + regs[i].dx, b.y + regs[i].dy));
+            }
+          }
+          final refined = _solveHomography(src2, dst2);
+          if (refined != null) passed.add(refined);
         }
-        final refined = _solveHomography(src2, dst2);
-        if (refined != null) passed.add(refined);
       }
     }
+    if (passed.isEmpty) return _GridFit(null, outside ? _outsidePhoto : _retakeMarkers);
+    if (passed.length == 1) return _GridFit(passed.first, null, box);
+    final numbered = [for (final p in passed) if (_labelsFound(im, p, box, n, thr) >= n * 0.8) p];
+    if (numbered.length == 1) return _GridFit(numbered.first, null, box);
+    final scores = [for (final p in passed) _letterMatch(im, p, box, n)];
+    final sorted = [...scores]..sort();
+    final best = sorted.last;
+    if (best >= 0.6 && best - sorted[sorted.length - 2] >= 0.15) return _GridFit(passed[scores.indexOf(best)], null, box);
+    return _GridFit(null, _retakeGrid);
   }
-  if (passed.isEmpty) return _GridFit(null, outside ? _outsidePhoto : _retakeMarkers);
-  if (passed.length == 1) return _GridFit(passed.first);
-  final numbered = [for (final p in passed) if (_labelsFound(im, p, n, thr) >= n * 0.8) p];
-  if (numbered.length == 1) return _GridFit(numbered.first);
-  final scores = [for (final p in passed) _letterMatch(im, p, n)];
-  final sorted = [...scores]..sort();
-  final best = sorted.last;
-  if (best >= 0.6 && best - sorted[sorted.length - 2] >= 0.15) return _GridFit(passed[scores.indexOf(best)]);
-  return _GridFit(null, _retakeGrid);
+
+  _GridFit? failed;
+  for (final box in BoxLayout.all) {
+    if (n > box.maxItems) continue;
+    final fit = tryBox(box);
+    if (fit.hom != null) return fit;
+    failed ??= fit;
+  }
+  return failed ?? _GridFit(null);
 }
 
 /// Fits the sheet, leaving out up to a fifth of the points if they are far off (a mis-seen bubble).
@@ -728,13 +752,13 @@ bool _fitsWithin(_Homography hom, List<Pt> src, List<Pt> dst, double tolMm) {
   return true;
 }
 
-bool _itemsInside(_Homography hom, int n, int w, int h) {
+bool _itemsInside(_Homography hom, BoxLayout box, int n, int w, int h) {
   for (var i = 0; i < n; i++) {
     for (final c in const [0, SheetLayout.choices - 1]) {
-      final b = SheetLayout.itemBubble(i, c);
+      final b = box.item(i, c);
       // The whole bubble, not just its middle, so a cut-off mark is never read as a light one.
       for (final (dx, dy) in const [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)]) {
-        final q = hom.map(b.x + dx * SheetLayout.bubbleR, b.y + dy * SheetLayout.bubbleR);
+        final q = hom.map(b.x + dx * box.bubbleR, b.y + dy * box.bubbleR);
         if (q.x < 0 || q.y < 0 || q.x > w - 1 || q.y > h - 1) return false;
       }
     }
@@ -743,13 +767,13 @@ bool _itemsInside(_Homography hom, int n, int w, int h) {
 }
 
 /// How many items have ink where their printed number should be, just left of choice A.
-int _labelsFound(_Img im, _Homography hom, int n, int thr) {
+int _labelsFound(_Img im, _Homography hom, BoxLayout box, int n, int thr) {
   var found = 0;
   for (var i = 0; i < n; i++) {
-    final at = SheetLayout.itemLabel(i);
+    final s = box.glyphScale, right = box.labelRightAt(i), row = box.item(i, 0).y;
     var dark = 0, total = 0;
-    for (var y = at.y - 1.4; y <= at.y + 1.41; y += 0.25) {
-      for (var x = at.x - 0.8; x <= at.x + 2.21; x += 0.25) {
+    for (var y = row - 1.4 * s; y <= row + 1.41 * s; y += 0.25 * s) {
+      for (var x = right - 2.8 * s; x <= right + 0.21 * s; x += 0.25 * s) {
         final q = hom.map(x, y);
         final px = q.x.round(), py = q.y.round();
         total++;
@@ -771,14 +795,15 @@ const bubbleLetterGlyphs = [
 
 /// How well the empty bubbles show the letter this placement expects there, from -1 to 1. The right
 /// way up scores about 0.8 and upside down about 0.5, even in photos of a light printout.
-double _letterMatch(_Img im, _Homography hom, int n) {
-  const cell = 0.2, size = 21;
+double _letterMatch(_Img im, _Homography hom, BoxLayout box, int n) {
+  const size = 21;
+  final cell = 0.2 * box.glyphScale;
   final patches = <Float64List>[];
   final letters = <int>[];
   final fills = <double>[];
   for (var i = 0; i < n; i++) {
     for (var c = 0; c < SheetLayout.choices; c++) {
-      final b = SheetLayout.itemBubble(i, c);
+      final b = box.item(i, c);
       final p = Float64List(size * size);
       var sum = 0.0;
       for (var y = 0; y < size; y++) {

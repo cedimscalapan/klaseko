@@ -4,7 +4,8 @@ import '../../core/analysis.dart';
 import '../../core/export/pdf_docs.dart';
 import '../../core/models.dart';
 import '../pdf_preview_screen.dart';
-import '../scan/camera_scan_screen.dart';
+import '../../core/omr/sheet_layout.dart';
+import '../scan/scan_roster_screen.dart';
 import '../scan/manual_check_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -68,11 +69,37 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       action();
     }
 
+    final fits = b.items.length <= BoxLayout.quarter.maxItems;
+    var quarter = fits && store.profile.sheetSize == 'quarter';
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: [
+                const ButtonSegment(value: false, label: Text('Full page')),
+                ButtonSegment(value: true, label: const Text('1/4 page'), enabled: fits),
+              ],
+              selected: {quarter},
+              onSelectionChanged: (s) {
+                setSheet(() => quarter = s.first);
+                final p = SchoolProfile.fromSettings(store.profile.toSettings())..sheetSize = s.first ? 'quarter' : 'full';
+                store.saveProfile(p);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+            child: Text(
+              fits ? (quarter ? 'Four answer sheets on each page, to cut along the lines. Saves paper.' : 'One answer sheet on each page.') : 'A 1/4 sheet holds up to ${BoxLayout.quarter.maxItems} items, so this exam needs full pages.',
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.article_outlined),
             title: const Text('Test paper'),
@@ -84,13 +111,13 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               leading: const Icon(Icons.badge_outlined),
               title: const Text('Answer sheets with names'),
               subtitle: Text('${b.learners.length} sheets, names and learner numbers filled in. Fastest to scan.'),
-              onTap: () => open(ctx, () => _openSheets(b, [for (final l in b.learners) SheetTarget(l)])),
+              onTap: () => open(ctx, () => _openSheets(b, [for (final l in b.learners) SheetTarget(l)], quarter)),
             ),
           ListTile(
             leading: const Icon(Icons.note_outlined),
             title: const Text('Blank answer sheets'),
             subtitle: const Text('Learners write their name and shade their number.'),
-            onTap: () => open(ctx, () => _openSheets(b, List.filled(b.learners.isEmpty ? 1 : b.learners.length, const SheetTarget(null)))),
+            onTap: () => open(ctx, () => _openSheets(b, List.filled(b.learners.isEmpty ? 1 : b.learners.length, const SheetTarget(null)), quarter)),
           ),
           ListTile(
             leading: const Icon(Icons.key_outlined),
@@ -100,11 +127,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
           ),
           const SizedBox(height: 8),
         ]),
-      ),
+      )),
     );
   }
 
-  void _openSheets(ExamBundle b, List<SheetTarget> targets) {
+  void _openSheets(ExamBundle b, List<SheetTarget> targets, bool quarter) {
     if (b.items.isEmpty) {
       toast(context, 'Add the answer key first so the sheet has the right number of items.');
       return;
@@ -114,7 +141,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       PdfPreviewScreen(
         title: 'Answer sheets',
         fileName: 'Answer sheets ${b.exam.title}.pdf',
-        build: () => buildAnswerSheets(profile: store.profile, cls: b.cls, exam: b.exam, itemCount: b.items.length, targets: targets),
+        build: () => buildAnswerSheets(profile: store.profile, cls: b.cls, exam: b.exam, itemCount: b.items.length, targets: targets, quarter: quarter),
       ),
     );
   }
@@ -198,8 +225,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             if (ready) ...[
               _step(Icons.print_outlined, 'Print', 'Test paper, answer sheets and answer key', () => _printMenu(b)),
               const SectionTitle('2 · Check'),
-              _step(Icons.document_scanner_outlined, 'Scan papers with the camera', b.unchecked.isEmpty ? 'All papers checked' : '${b.unchecked.length} left to check',
-                  () => push(context, CameraScanScreen(examId: b.exam.id)),
+              _step(Icons.document_scanner_outlined, 'Scan papers', b.unchecked.isEmpty ? 'All papers checked' : 'Tap a name, scan, and the score is recorded. ${b.unchecked.length} left.',
+                  () => push(context, ScanRosterScreen(examId: b.exam.id)),
                   highlight: b.unchecked.isNotEmpty),
               _step(Icons.touch_app_outlined, 'Check by tapping', 'Enter answers by hand, without the camera', () => push(context, ManualCheckScreen(examId: b.exam.id))),
             ],

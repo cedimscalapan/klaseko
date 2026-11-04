@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
@@ -63,131 +64,94 @@ Future<Uint8List> buildAnswerSheets({
   required Exam exam,
   required int itemCount,
   required List<SheetTarget> targets,
+  bool quarter = false,
 }) async {
   final doc = pw.Document(title: 'Answer sheets - ${exam.title}', author: 'KlaseKo');
   final format = paperFormat(profile.paper);
   final pageW = format.width / mm, pageH = format.height / mm;
-  final ox = (pageW - SheetLayout.frameW) / 2;
-  final oy = (pageH - SheetLayout.frameH) / 2;
-  final n = itemCount.clamp(1, SheetLayout.maxItems);
+  final box = quarter && itemCount <= BoxLayout.quarter.maxItems ? BoxLayout.quarter : BoxLayout.full;
+  final n = itemCount.clamp(1, box.maxItems);
 
-  pw.Widget at(double x, double y, pw.Widget child) => pw.Positioned(left: (ox + x) * mm, top: (oy + y) * mm, child: child);
-  // The answer box is centered on the page; everything in it is placed from its left edge.
-  final boxX = (SheetLayout.frameW - SheetLayout.areaRight(n)) / 2;
-  pw.Widget atBox(double x, double y, pw.Widget child) => at(boxX + x, y, child);
-
-  pw.Widget bubble(double cx, double cy, double r, String label, {bool filled = false}) => atBox(
-        cx - r,
-        cy - r,
-        pw.Container(
-          width: 2 * r * mm,
-          height: 2 * r * mm,
-          alignment: pw.Alignment.center,
-          decoration: pw.BoxDecoration(
-            shape: pw.BoxShape.circle,
-            color: filled ? PdfColors.black : null,
-            border: pw.Border.all(color: PdfColors.grey700, width: 0.7),
+  if (box == BoxLayout.quarter) {
+    // Four sheets on a page, to be cut along the lines. A paper too small for the box prints it slightly
+    // smaller; the scanner measures from the markers, so the size does not matter to it.
+    final cellW = pageW / 2, cellH = pageH / 2;
+    const pad = 4.5, headerH = 13.0;
+    final k = math.min(1.0, math.min((cellW - 2 * pad) / (box.right(n) + box.marker), (cellH - 2 * pad - headerH) / (box.bottom(n) + box.marker)));
+    for (var start = 0; start < targets.length; start += 4) {
+      final children = <pw.Widget>[
+        pw.Positioned(left: 0, top: cellH * mm, child: pw.Container(width: format.width, height: 0.15 * mm, color: PdfColors.grey400)),
+        pw.Positioned(left: cellW * mm, top: 0, child: pw.Container(width: 0.15 * mm, height: format.height, color: PdfColors.grey400)),
+      ];
+      for (var slot = 0; slot < 4 && start + slot < targets.length; slot++) {
+        final l = targets[start + slot].learner;
+        final x = (slot % 2) * cellW, y = (slot ~/ 2) * cellH;
+        children.add(pw.Positioned(
+          left: (x + pad) * mm,
+          top: (y + pad - 0.5) * mm,
+          child: pw.SizedBox(
+            width: (cellW - 2 * pad) * mm,
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              _t(exam.title, size: 7, bold: true),
+              _t('${cls.subject} | ${cls.title} | $n items', size: 6, color: PdfColors.grey700),
+              pw.SizedBox(height: 2),
+              pw.Row(children: [
+                pw.Expanded(flex: 4, child: _line('Name', l?.fullName ?? '')),
+                pw.SizedBox(width: 6),
+                pw.Expanded(child: _line('Score', '')),
+              ]),
+            ]),
           ),
-          child: filled ? null : pw.Text(label, style: pw.TextStyle(fontSize: 6.5, color: PdfColors.grey400)),
-        ),
-      );
-
-  for (final target in targets) {
-    final l = target.learner;
-    final children = <pw.Widget>[];
-    // The answer box: coded markers (a black border plus a 4 x 4 pattern that names each marker)
-    // joined by thin lines that stop short of them, so a line never touches a marker.
-    const cell = SheetLayout.areaMarkerCell;
-    const half = SheetLayout.areaMarker / 2;
-    final box = SheetLayout.areaMarkerCenters(n);
-    for (var id = 0; id < box.length; id++) {
-      final c = box[id];
-      final x0 = c.x - half, y0 = c.y - half;
-      children.add(atBox(x0, y0, pw.Container(width: SheetLayout.areaMarker * mm, height: SheetLayout.areaMarker * mm, color: PdfColors.white)));
-      for (var r = 0; r < 6; r++) {
-        for (var col = 0; col < 6; col++) {
-          final border = r == 0 || col == 0 || r == 5 || col == 5;
-          if (!border && !SheetLayout.markerBit(SheetLayout.areaCodeStart + id, r - 1, col - 1)) continue;
-          // Slight overlap so neighbouring black cells print as one solid area.
-          children.add(atBox(x0 + col * cell, y0 + r * cell, pw.Container(width: (cell + 0.05) * mm, height: (cell + 0.05) * mm, color: PdfColors.black)));
-        }
+        ));
+        children.addAll(_answerBox(box, n, l, x + (cellW - box.right(n) * k) / 2, y + pad + headerH + box.marker / 2 * k, k));
       }
-    }
-    const gap = half + 2.5;
-    void edge(Pt a, Pt b) {
-      final across = a.y == b.y;
-      children.add(atBox(
-        across ? a.x + gap : a.x - 0.1,
-        across ? a.y - 0.1 : a.y + gap,
-        pw.Container(width: (across ? b.x - a.x - 2 * gap : 0.2) * mm, height: (across ? 0.2 : b.y - a.y - 2 * gap) * mm, color: PdfColors.grey500),
+      doc.addPage(pw.Page(
+        pageFormat: format,
+        margin: pw.EdgeInsets.zero,
+        build: (_) => pw.SizedBox(width: format.width, height: format.height, child: pw.Stack(children: children)),
       ));
     }
+    return doc.save();
+  }
 
-    edge(box[0], box[6]);
-    edge(box[6], box[1]);
-    edge(box[3], box[7]);
-    edge(box[7], box[2]);
-    edge(box[0], box[4]);
-    edge(box[4], box[3]);
-    edge(box[1], box[5]);
-    edge(box[5], box[2]);
-    children.add(atBox(0, SheetLayout.areaTop - 8.6, _t('ANSWER BOX: shade inside. The teacher scans only this box.', size: 6.5, color: PdfColors.grey700)));
-
-    // Header
-    children.add(at(
-      6,
-      6,
-      pw.SizedBox(
-        width: 168 * mm,
-        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          _t('KlaseKo Answer Sheet', size: 12, bold: true),
-          pw.SizedBox(height: 2),
-          _t(exam.title, size: 9, bold: true),
-          _t('${cls.subject} | ${cls.title} | ${profile.termName(exam.term)} | ${n} items', size: 8),
-          if (profile.schoolName.isNotEmpty) _t(profile.schoolName, size: 8, color: PdfColors.grey700),
-          pw.SizedBox(height: 6),
-          _line('Name', l?.fullName ?? ''),
-          pw.SizedBox(height: 4),
-          pw.Row(children: [
-            pw.Expanded(child: _line('LRN', l?.lrn ?? '')),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: _line('Date', '')),
+  final ox = (pageW - SheetLayout.frameW) / 2;
+  final oy = (pageH - SheetLayout.frameH) / 2;
+  for (final target in targets) {
+    final l = target.learner;
+    final children = <pw.Widget>[
+      pw.Positioned(
+        left: (ox + 6) * mm,
+        top: (oy + 6) * mm,
+        child: pw.SizedBox(
+          width: 168 * mm,
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            _t('KlaseKo Answer Sheet', size: 12, bold: true),
+            pw.SizedBox(height: 2),
+            _t(exam.title, size: 9, bold: true),
+            _t('${cls.subject} | ${cls.title} | ${profile.termName(exam.term)} | $n items', size: 8),
+            if (profile.schoolName.isNotEmpty) _t(profile.schoolName, size: 8, color: PdfColors.grey700),
+            pw.SizedBox(height: 6),
+            _line('Name', l?.fullName ?? ''),
+            pw.SizedBox(height: 4),
+            pw.Row(children: [
+              pw.Expanded(child: _line('LRN', l?.lrn ?? '')),
+              pw.SizedBox(width: 8),
+              pw.Expanded(child: _line('Date', '')),
+            ]),
+            pw.SizedBox(height: 4),
+            pw.Row(children: [
+              pw.Expanded(child: _line('Learner No.', l == null ? '' : l.num.toString().padLeft(2, '0'))),
+              pw.SizedBox(width: 8),
+              pw.Expanded(child: _line('Score', '')),
+            ]),
+            pw.SizedBox(height: 6),
+            _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold the sheet or write on the black squares.', size: 6.5, color: PdfColors.grey700),
           ]),
-          pw.SizedBox(height: 4),
-          pw.Row(children: [
-            pw.Expanded(child: _line('Learner No.', l == null ? '' : l.num.toString().padLeft(2, '0'))),
-            pw.SizedBox(width: 8),
-            pw.Expanded(child: _line('Score', '')),
-          ]),
-          pw.SizedBox(height: 6),
-          _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold the sheet or write on the black squares.', size: 6.5, color: PdfColors.grey700),
-        ]),
+        ),
       ),
-    ));
-
-    // Learner number, inside the answer box
-    children.add(atBox(6, 66.3, _t('LEARNER NO.', size: 6.5, bold: true)));
-    final tens = l == null ? -1 : (l.num ~/ 10) % 10;
-    final ones = l == null ? -1 : l.num % 10;
-    for (var col = 0; col < 2; col++) {
-      children.add(atBox(6, SheetLayout.areaIdBubble(col, 0).y - 1.3, _t(col == 0 ? 'Tens' : 'Ones', size: 7, color: PdfColors.grey700)));
-      for (var d = 0; d < 10; d++) {
-        final c = SheetLayout.areaIdBubble(col, d);
-        final filled = (col == 0 && d == tens) || (col == 1 && d == ones);
-        children.add(bubble(c.x, c.y, SheetLayout.idR, '$d', filled: filled));
-      }
-    }
-
-    // Item bubbles
-    for (var i = 0; i < n; i++) {
-      final lab = SheetLayout.itemLabel(i);
-      children.add(atBox(lab.x - 4, lab.y - 1.7, pw.SizedBox(width: 6 * mm, child: _t('${i + 1}', size: 7.5, bold: true, align: pw.TextAlign.right))));
-      for (var c = 0; c < SheetLayout.choices; c++) {
-        final b = SheetLayout.itemBubble(i, c);
-        children.add(bubble(b.x, b.y, SheetLayout.bubbleR, 'ABCD'[c]));
-      }
-    }
-
+      pw.Positioned(left: (ox + (SheetLayout.frameW - box.right(n)) / 2) * mm, top: (oy + box.top - 8.6) * mm, child: _t('ANSWER BOX: shade inside. The teacher scans only this box.', size: 6.5, color: PdfColors.grey700)),
+      ..._answerBox(box, n, l, ox + (SheetLayout.frameW - box.right(n)) / 2, oy, 1),
+    ];
     doc.addPage(pw.Page(
       pageFormat: format,
       margin: pw.EdgeInsets.zero,
@@ -195,6 +159,89 @@ Future<Uint8List> buildAnswerSheets({
     ));
   }
   return doc.save();
+}
+
+/// The answer box: markers, learner number and item bubbles. Box coordinate (x, y) prints at
+/// (left + x * k, top + y * k) millimetres on the page.
+List<pw.Widget> _answerBox(BoxLayout box, int n, Learner? l, double left, double top, double k) {
+  final children = <pw.Widget>[];
+  pw.Widget at(double x, double y, pw.Widget child) => pw.Positioned(left: (left + x * k) * mm, top: (top + y * k) * mm, child: child);
+
+  pw.Widget bubble(double cx, double cy, double r, String label, {bool filled = false}) => at(
+        cx - r,
+        cy - r,
+        pw.Container(
+          width: 2 * r * k * mm,
+          height: 2 * r * k * mm,
+          alignment: pw.Alignment.center,
+          decoration: pw.BoxDecoration(
+            shape: pw.BoxShape.circle,
+            color: filled ? PdfColors.black : null,
+            border: pw.Border.all(color: PdfColors.grey700, width: 0.7),
+          ),
+          child: filled ? null : pw.Text(label, style: pw.TextStyle(fontSize: box.letterFont * k, color: PdfColors.grey400)),
+        ),
+      );
+
+  // Coded markers (a black border plus a 4 x 4 pattern that names each marker), joined by thin
+  // lines that stop short of them, so a line never touches a marker.
+  final cell = box.markerCell, half = box.marker / 2;
+  final corners = box.markers(n);
+  for (var id = 0; id < corners.length; id++) {
+    final c = corners[id];
+    final x0 = c.x - half, y0 = c.y - half;
+    children.add(at(x0, y0, pw.Container(width: box.marker * k * mm, height: box.marker * k * mm, color: PdfColors.white)));
+    for (var r = 0; r < 6; r++) {
+      for (var col = 0; col < 6; col++) {
+        final border = r == 0 || col == 0 || r == 5 || col == 5;
+        if (!border && !SheetLayout.markerBit(box.codeStart + id, r - 1, col - 1)) continue;
+        // Slight overlap so neighbouring black cells print as one solid area.
+        children.add(at(x0 + col * cell, y0 + r * cell, pw.Container(width: (cell * k + 0.05) * mm, height: (cell * k + 0.05) * mm, color: PdfColors.black)));
+      }
+    }
+  }
+  final gap = half + 2.5;
+  void edge(Pt a, Pt b) {
+    final across = a.y == b.y;
+    children.add(at(
+      across ? a.x + gap : a.x,
+      across ? a.y : a.y + gap,
+      pw.Container(width: (across ? (b.x - a.x - 2 * gap) * k : 0.2) * mm, height: (across ? 0.2 : (b.y - a.y - 2 * gap) * k) * mm, color: PdfColors.grey500),
+    ));
+  }
+
+  edge(corners[0], corners[6]);
+  edge(corners[6], corners[1]);
+  edge(corners[3], corners[7]);
+  edge(corners[7], corners[2]);
+  edge(corners[0], corners[4]);
+  edge(corners[4], corners[3]);
+  edge(corners[1], corners[5]);
+  edge(corners[5], corners[2]);
+
+  // Learner number
+  if (box == BoxLayout.full) children.add(at(6, 66.3, _t('LEARNER NO.', size: 6.5, bold: true)));
+  final tens = l == null ? -1 : (l.num ~/ 10) % 10;
+  final ones = l == null ? -1 : l.num % 10;
+  for (var col = 0; col < 2; col++) {
+    children.add(at(box.idLabelX, box.id(col, 0).y - 1.3, _t(col == 0 ? 'Tens' : 'Ones', size: (box.letterFont + 0.5) * k, color: PdfColors.grey700)));
+    for (var d = 0; d < 10; d++) {
+      final c = box.id(col, d);
+      final filled = (col == 0 && d == tens) || (col == 1 && d == ones);
+      children.add(bubble(c.x, c.y, box.idR, '$d', filled: filled));
+    }
+  }
+
+  // Item bubbles
+  for (var i = 0; i < n; i++) {
+    final y = box.item(i, 0).y;
+    children.add(at(box.labelRightAt(i) - 6, y - box.labelFont * 0.21, pw.SizedBox(width: 6 * k * mm, child: _t('${i + 1}', size: box.labelFont * k, bold: true, align: pw.TextAlign.right))));
+    for (var c = 0; c < SheetLayout.choices; c++) {
+      final b = box.item(i, c);
+      children.add(bubble(b.x, b.y, box.bubbleR, 'ABCD'[c]));
+    }
+  }
+  return children;
 }
 
 pw.Widget _line(String label, String value) => pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
@@ -860,3 +907,68 @@ Future<Uint8List> buildGradeSheetPdf({
   ));
   return doc.save();
 }
+
+/// School Form 5: Report on Promotion and Level of Proficiency.
+Future<Uint8List> buildSf5Pdf(Sf5Data d) async {
+  final doc = pw.Document(title: 'SF5 ${d.cls.title}', author: 'KlaseKo');
+  final border = pw.TableBorder.all(width: 0.4, color: PdfColors.grey700);
+  pw.TableRow row(String lrn, String name, String ga, String action, String below, {bool bold = false, PdfColor? bg}) => pw.TableRow(
+        decoration: bg == null ? null : pw.BoxDecoration(color: bg),
+        children: [
+          _cell(lrn, size: 7, bold: bold),
+          _cell(name, size: 7, bold: bold, align: pw.Alignment.centerLeft),
+          _cell(ga, size: 7.5, bold: bold),
+          _cell(action, size: 7, bold: bold),
+          _cell(below, size: 6.5, bold: bold, align: pw.Alignment.centerLeft),
+        ],
+      );
+  pw.Widget summary(String title, List<Sf5Count> counts) => pw.Table(border: border, children: [
+        pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey200), children: [
+          _cell(title, bold: true, size: 7),
+          _cell('M', bold: true, size: 7),
+          _cell('F', bold: true, size: 7),
+          _cell('Total', bold: true, size: 7),
+        ]),
+        for (final c in counts)
+          pw.TableRow(children: [_cell(c.label, size: 7, align: pw.Alignment.centerLeft), _cell('${c.male}', size: 7), _cell('${c.female}', size: 7), _cell('${c.total}', size: 7, bold: true)]),
+      ]);
+  doc.addPage(pw.MultiPage(
+    pageFormat: paperFormat(d.profile.paper),
+    margin: const pw.EdgeInsets.all(28),
+    build: (ctx) => [
+      pw.Center(child: _t('School Form 5 (SF5) Report on Promotion and Level of Proficiency', size: 11, bold: true)),
+      pw.SizedBox(height: 4),
+      pw.Center(child: _t('${d.profile.schoolName} | School ID ${d.profile.schoolId} | SY ${d.profile.sy}', size: 8)),
+      pw.Center(child: _t('${d.profile.region} | ${d.profile.division} | ${d.profile.district}', size: 8)),
+      pw.Center(child: _t('${d.cls.title} | Adviser: ${d.profile.teacher}', size: 8)),
+      pw.SizedBox(height: 8),
+      pw.Table(border: border, columnWidths: const {
+        0: pw.FixedColumnWidth(64),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FixedColumnWidth(42),
+        3: pw.FixedColumnWidth(84),
+        4: pw.FlexColumnWidth(2),
+      }, children: [
+        row('LRN', "Learner's Name", 'General Average', 'Action Taken', 'Learning Areas Below 75', bold: true, bg: PdfColors.grey200),
+        for (final sex in const ['M', 'F']) ...[
+          row('', sex == 'M' ? 'MALE' : 'FEMALE', '', '', '', bold: true),
+          for (final r in d.rows.where((r) => r.learner.sex == sex))
+            row(r.learner.lrn, r.learner.fullName, r.generalAverage ?? '', r.action, r.belowPassing.join(', ')),
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(child: summary('Summary', d.actions)),
+        pw.SizedBox(width: 12),
+        pw.Expanded(child: summary('Level of Proficiency', d.levels)),
+      ]),
+      pw.SizedBox(height: 22),
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
+        _signatureSmall(d.profile.teacher, 'Class Adviser'),
+        _signatureSmall(d.profile.schoolHead, 'School Head'),
+      ]),
+    ],
+  ));
+  return doc.save();
+}
+

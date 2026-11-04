@@ -19,7 +19,7 @@ Uint8List photo({
   int seed = 1,
   bool numbers = true,
   bool letters = false,
-  bool box = false,
+  BoxLayout? box,
 }) {
   const w = 1200, h = 1500;
   const pageW = 215.9, pageH = 279.4;
@@ -44,15 +44,15 @@ Uint8List photo({
       if (px >= 0 && py >= 0 && px <= pageW && py <= pageH) {
         v = 228;
         final fx = px - ox, fy = py - oy;
-        final centers = box ? SheetLayout.areaMarkerCenters(answers.length) : SheetLayout.markerCenters;
-        final size = box ? SheetLayout.areaMarker : SheetLayout.marker;
+        final centers = box?.markers(answers.length) ?? SheetLayout.markerCenters;
+        final size = box?.marker ?? SheetLayout.marker;
         for (var id = 0; id < centers.length; id++) {
           final c = centers[id];
           final lx = fx - (c.x - size / 2), ly = fy - (c.y - size / 2);
           if (lx < 0 || ly < 0 || lx >= size || ly >= size) continue;
           final col = lx ~/ (size / 6), row = ly ~/ (size / 6);
           final border = row == 0 || col == 0 || row == 5 || col == 5;
-          if (border || SheetLayout.markerBit(box ? SheetLayout.areaCodeStart + id : id, row - 1, col - 1)) v = 25;
+          if (border || SheetLayout.markerBit((box?.codeStart ?? 0) + id, row - 1, col - 1)) v = 25;
         }
         void bubble(double cx, double cy, double r, String key) {
           final d = sqrt((fx - cx) * (fx - cx) + (fy - cy) * (fy - cy));
@@ -60,30 +60,31 @@ Uint8List photo({
           if (d < r * 0.92 && shaded.contains(key)) v = (key.startsWith('d') ? 30 : pencil).toDouble();
         }
 
-        if (fy > SheetLayout.firstRowY - 4 && fy < SheetLayout.firstRowY + 20 * SheetLayout.rowStep) {
+        final items = box ?? BoxLayout.full;
+        if (fy > items.firstRowY - 4 && fy < items.firstRowY + items.rowsPerColumn * items.rowStep) {
           for (var i = 0; i < answers.length; i++) {
             // Item number, right-aligned just left of choice A: one 1.6 mm wide digit per character.
-            final lab = SheetLayout.itemLabel(i);
+            final s = items.glyphScale, end = items.labelRightAt(i);
             final digits = '${i + 1}'.length;
-            if (numbers && (fy - lab.y).abs() < 1.3 && fx < lab.x + 2 && fx > lab.x + 2 - 1.6 * digits && ((lab.x + 2 - fx) % 1.6) < 0.4) v = 30;
+            if (numbers && (fy - items.item(i, 0).y).abs() < 1.3 * s && fx < end && fx > end - 1.6 * s * digits && ((end - fx) % (1.6 * s)) < 0.4 * s) v = 30;
             for (var c = 0; c < 4; c++) {
-              final b = SheetLayout.itemBubble(i, c);
+              final b = items.item(i, c);
               if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) {
-                bubble(b.x, b.y, SheetLayout.bubbleR, 'i$i:$c');
+                bubble(b.x, b.y, items.bubbleR, 'i$i:$c');
                 if (letters && !shaded.contains('i$i:$c')) {
                   final g = bubbleLetterGlyphs[c];
-                  final row = ((fy - b.y) / 0.2 + g.length / 2).floor(), col = ((fx - b.x) / 0.2 + g.first.length / 2).floor();
+                  final row = ((fy - b.y) / (0.2 * s) + g.length / 2).floor(), col = ((fx - b.x) / (0.2 * s) + g.first.length / 2).floor();
                   if (row >= 0 && row < g.length && col >= 0 && col < g.first.length) v = min(v, 228.0 - int.parse(g[row][col]) * 5);
                 }
               }
             }
           }
         }
-        if (box) {
+        if (box != null) {
           for (var col = 0; col < 2; col++) {
             for (var d = 0; d < 10; d++) {
-              final b = SheetLayout.areaIdBubble(col, d);
-              if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) bubble(b.x, b.y, SheetLayout.idR, 'd$col:$d');
+              final b = box.id(col, d);
+              if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) bubble(b.x, b.y, box.idR, 'd$col:$d');
             }
           }
         } else if (fx > SheetLayout.idX0 - 4) {
@@ -186,11 +187,11 @@ void main() {
   });
 
   // The answer box: the photo is centred on sheet point (cx, cy) mm.
-  Uint8List boxPhoto(List<int> a, int learner, double cx, double cy, {double rotDeg = 0, double pxPerMm = 12}) {
+  Uint8List boxPhoto(List<int> a, int learner, double cx, double cy, {double rotDeg = 0, double pxPerMm = 12, BoxLayout layout = BoxLayout.full, bool numbers = true, bool letters = false}) {
     final r = rotDeg * pi / 180, ca = cos(r), sa = sin(r);
     final px = cx - 90, py = cy - 125; // from the page centre, which is the sheet frame's centre
     final u = (px * ca - py * sa) * pxPerMm, v = (px * sa + py * ca) * pxPerMm;
-    return photo(answers: a, learnerNum: learner, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, box: true);
+    return photo(answers: a, learnerNum: learner, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, box: layout, numbers: numbers, letters: letters);
   }
 
   void expectBox(OmrResult r, int? learner) {
@@ -220,6 +221,32 @@ void main() {
 
   test('reads the answer box with no markers in the photo, learner number included', () {
     expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 44, 116, pxPerMm: 15), 10)), 27);
+  });
+
+  test('reads a 1/4 sheet', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 30.5, 35, layout: BoxLayout.quarter, pxPerMm: 14), 10)), 27);
+  });
+
+  test('reads a tilted, upside-down 1/4 sheet', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 53, 30.5, 35, layout: BoxLayout.quarter, pxPerMm: 13, rotDeg: 172), 10)), 53);
+  });
+
+  test('reads a 1/4 sheet with two columns of items', () {
+    final thirty = answers.sublist(0, 30);
+    final r = readAnswerSheet(OmrRequest(boxPhoto(thirty, 12, 32, 47.5, layout: BoxLayout.quarter), 30));
+    expect(r.ok, isTrue, reason: r.error);
+    expect(r.learnerNum, 12);
+    for (var i = 0; i < thirty.length; i++) {
+      if (!r.review.contains(i)) expect(r.answers[i], thirty[i], reason: 'item ${i + 1}');
+    }
+  });
+
+  test('reads a 1/4 sheet with no markers or numbers in the photo', () {
+    final r = readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 30.5, 35, layout: BoxLayout.quarter, pxPerMm: 22, numbers: false, letters: true), 10));
+    expect(r.ok, isTrue, reason: r.error);
+    for (var i = 0; i < ten.length; i++) {
+      if (!r.review.contains(i)) expect(r.answers[i], ten[i], reason: 'item ${i + 1}');
+    }
   });
 
   test('reads the answers when only the learner number is outside the photo', () {

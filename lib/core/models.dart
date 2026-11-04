@@ -383,6 +383,7 @@ class SchoolProfile {
   int terms;
   String paper; // letter, long, a4
   String themeMode; // system, light, dark
+  String sheetSize; // full, quarter
 
   SchoolProfile({
     this.teacher = '',
@@ -396,6 +397,7 @@ class SchoolProfile {
     this.terms = 3,
     this.paper = 'letter',
     this.themeMode = 'system',
+    this.sheetSize = 'full',
   });
 
   Map<String, String> toSettings() => {
@@ -410,6 +412,7 @@ class SchoolProfile {
         'terms': '$terms',
         'paper': paper,
         'theme_mode': themeMode,
+        'sheet_size': sheetSize,
       };
 
   factory SchoolProfile.fromSettings(Map<String, String> s) => SchoolProfile(
@@ -424,6 +427,7 @@ class SchoolProfile {
         terms: int.tryParse(s['terms'] ?? '') ?? 3,
         paper: s['paper'] ?? 'letter',
         themeMode: s['theme_mode'] ?? 'system',
+        sheetSize: s['sheet_size'] ?? 'full',
       );
 
   String termLabel(int t) => terms == 4 ? 'Q$t' : 'T$t';

@@ -70,8 +70,8 @@ class Sf9Screen extends StatelessWidget {
             AppCard(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Text(
-                'Your own subject (${cls.subject}) fills in automatically from the class record. '
-                'Type the grades your co-teachers give you for the other $other learning area(s), and rate the core values each term.',
+                'Attendance and every subject you handle in this section fill in by themselves from the class records. '
+                'Type only the grades co-teachers give you for other learning areas, and rate the core values each term.',
               ),
             ),
             const SectionTitle('Learners'),

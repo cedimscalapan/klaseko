@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../brand.dart';
 import 'about_screen.dart';
+import 'app_lock.dart';
 import 'backup.dart';
 import 'profile_form.dart';
 
@@ -70,6 +71,10 @@ class MoreScreen extends StatelessWidget {
         const SectionTitle('Appearance'),
         _tile(context, Icons.contrast_rounded, 'Theme', _themeLabel(p.themeMode), () => _chooseTheme(context)),
         const SectionTitle('Your data'),
+        Loader<bool>(
+          load: AppLock.hasPin,
+          builder: (context, on) => _tile(context, on ? Icons.lock_rounded : Icons.lock_open_rounded, 'App lock', on ? 'On. A PIN is asked when KlaseKo opens.' : 'Off. Protect learner records with a PIN.', () => _appLock(context, on)),
+        ),
         Loader<Map<String, String>>(
           load: store.repo.settings,
           builder: (context, settings) => _tile(context, Icons.backup_outlined, 'Back up', backupStatus(settings), () => backUpNow(context)),
@@ -97,6 +102,41 @@ class MoreScreen extends StatelessWidget {
         const SizedBox(height: 6),
         Center(child: Text('Version ${Brand.version} · Works offline', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
       ]),
+    );
+  }
+
+  Future<void> _appLock(BuildContext context, bool on) async {
+    if (!on) {
+      await push(context, const SetPinScreen());
+      store.changed();
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.password_rounded),
+            title: const Text('Change PIN'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              await push(context, const SetPinScreen());
+              store.changed();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_open_rounded),
+            title: const Text('Turn off app lock'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              await AppLock.clear();
+              store.changed();
+            },
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
     );
   }
 
@@ -217,7 +257,7 @@ class PrintTipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _InfoScreen(title: 'Printing answer sheets', children: [
-        _p('Print at 100% size ("Actual size"), not "Fit to page", so the answer box prints at the right size.'),
+        _p('Choose Full page or 1/4 page when you print. A 1/4 page puts four answer sheets on one paper, up to 45 items each. Cut along the lines.'),
         _p('Use the paper size set in your school profile (short, long or A4). Black ink only; grayscale is fine.'),
         _p('Photocopies work if the circles and item numbers stay clear. Avoid copies that are too light.'),
         _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black squares.'),

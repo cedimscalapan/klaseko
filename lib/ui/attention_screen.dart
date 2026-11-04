@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/export/form_data.dart';
 import '../core/grading.dart';
@@ -83,6 +84,12 @@ class AttentionScreen extends StatelessWidget {
     );
   }
 
+  /// A short message the teacher can edit and send through SMS or Messenger.
+  String _note(SchoolClass c, AttentionRow r, List<String> reasons) =>
+      'Magandang araw po. This is ${store.profile.teacher}, the ${c.subject} teacher of ${r.learner.first} (${c.title}). '
+      'I would like to talk about ${r.learner.first}\'s progress: ${reasons.join(', ').toLowerCase()}. '
+      'May we set a time to talk? Salamat po.';
+
   Widget _row(BuildContext context, SchoolClass c, AttentionRow r) {
     final reasons = [
       if (r.grade != null) '${store.profile.termName(r.term)} grade ${r.grade}',
@@ -102,7 +109,11 @@ class AttentionScreen extends StatelessWidget {
               if (guardian.isNotEmpty) Text('Guardian: $guardian', style: TextStyle(fontSize: 12.5, color: mutedText(context))),
             ]),
           ),
-          Icon(Icons.chevron_right_rounded, color: mutedText(context)),
+          IconButton(
+            tooltip: 'Write to the guardian',
+            icon: Icon(Icons.forum_outlined, color: brandBlue),
+            onPressed: () => Share.share(_note(c, r, reasons)),
+          ),
         ]),
       ),
     );

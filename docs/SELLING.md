@@ -29,7 +29,7 @@ A plan ending never locks anyone out. Teachers can still open, edit and print al
 
 Every code is recorded in `sales.csv` in the `.klaseko` folder of your home folder.
 
-A code works only on the phone it was made for. A teacher who changes phones, or reinstalls the app, gets a new phone ID and needs a new code from you. Use the plan's original end date as the start, minus the plan length, or give the days left as a courtesy.
+A code works only on the phone it was made for. A teacher who changes phones, or reinstalls the app, gets a new phone ID and needs a new code from you. Check `sales.csv` for when their plan ends, and give them a code that covers the time they have left.
 
 ## Your keys
 

@@ -9,6 +9,7 @@ import '../scan/scan_roster_screen.dart';
 import '../scan/manual_check_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../forms/archive_info.dart';
 import 'exam_editor_screen.dart';
 import 'exams_screen.dart';
 import 'import_quiz_screen.dart';
@@ -140,6 +141,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       context,
       PdfPreviewScreen(
         title: 'Answer sheets',
+        archive: ArchiveInfo(b.cls, 'sheets', term: b.exam.term),
         fileName: 'Answer sheets ${b.exam.title}.pdf',
         build: () => buildAnswerSheets(profile: store.profile, cls: b.cls, exam: b.exam, itemCount: b.items.length, targets: targets, quarter: quarter),
       ),
@@ -159,6 +161,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       context,
       PdfPreviewScreen(
         title: key ? 'Answer key' : 'Test paper',
+        archive: ArchiveInfo(b.cls, 'test', term: b.exam.term),
         fileName: '${b.exam.title}${key ? ' answer key' : ''}.pdf',
         build: () => buildTestPaper(profile: store.profile, cls: b.cls, exam: b.exam, items: b.items, answerKey: key),
       ),

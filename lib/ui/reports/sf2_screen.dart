@@ -5,6 +5,7 @@ import '../../core/export/pdf_docs.dart';
 import '../../core/export/share.dart';
 import '../../core/export/xlsx_docs.dart';
 import '../../core/models.dart';
+import '../forms/archive_info.dart';
 import '../pdf_preview_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -47,7 +48,7 @@ class _Sf2ScreenState extends State<Sf2Screen> {
                   child: OutlinedButton.icon(
                     onPressed: () => push(
                       context,
-                      PdfPreviewScreen(title: 'SF2 ${d.monthLabel}', fileName: 'SF2 ${widget.cls.title} ${d.monthLabel}.pdf', build: () => buildSf2Pdf(d)),
+                      PdfPreviewScreen(title: 'SF2 ${d.monthLabel}', fileName: 'SF2 ${widget.cls.title} ${d.monthLabel}.pdf', archive: ArchiveInfo(widget.cls, 'sf2', period: d.monthLabel), build: () => buildSf2Pdf(d)),
                     ),
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: const Text('PDF'),
@@ -56,7 +57,7 @@ class _Sf2ScreenState extends State<Sf2Screen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => withProgress(context, 'Making SF2...', () => saveAndShare(buildSf2Xlsx(d), 'SF2 ${widget.cls.title} ${d.monthLabel}.xlsx', xlsxMime)),
+                    onPressed: () => withProgress(context, 'Making SF2...', () => shareAndArchive(ArchiveInfo(widget.cls, 'sf2', period: d.monthLabel), buildSf2Xlsx(d), 'SF2 ${widget.cls.title} ${d.monthLabel}.xlsx', xlsxMime)),
                     icon: const Icon(Icons.table_view_outlined),
                     label: const Text('Excel'),
                   ),

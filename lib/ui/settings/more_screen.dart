@@ -10,6 +10,8 @@ import '../../core/models.dart';
 import '../../core/plan.dart';
 import '../../core/sample.dart';
 import '../theme.dart';
+import '../forms/archive_screen.dart';
+import '../forms/templates_screen.dart';
 import '../widgets.dart';
 import '../brand.dart';
 import 'about_screen.dart';
@@ -84,6 +86,9 @@ class MoreScreen extends StatelessWidget {
             () => push(context, const PlanScreen()),
           ),
         ),
+        const SectionTitle('Forms'),
+        _tile(context, Icons.folder_rounded, 'Forms archive', 'Every form you made, sorted by subject, term, week and form', () => push(context, const ArchiveScreen())),
+        _tile(context, Icons.upload_file_rounded, 'Your form layouts', 'Upload your school\'s own Excel forms for KlaseKo to fill', () => push(context, const TemplatesScreen())),
         const SectionTitle('Appearance'),
         _tile(context, Icons.contrast_rounded, 'Theme', _themeLabel(p.themeMode), () => _chooseTheme(context)),
         const SectionTitle('Your data'),
@@ -290,6 +295,7 @@ class PrivacyScreen extends StatelessWidget {
         _p('KlaseKo works without internet. Learner names, LRNs, attendance, scores and photos of answer sheets stay on this phone.'),
         _p('The database is encrypted. Its key is kept in your phone\'s secure storage (Android Keystore), so the file cannot be read if it is copied off the phone.'),
         _p('Photos of answer sheets are read and then discarded. They are not saved in your gallery.'),
+        _p('Forms you make are kept in the Forms archive, inside the app\'s private storage. They are not part of the encrypted database, and they are not in backups. You can make them again anytime.'),
         _p('Backup files are not encrypted. Keep them in a private place, such as your own Google Drive, and do not post them in group chats.'),
         _p('Use learner data only for school purposes, following the Data Privacy Act of 2012 (RA 10173) and your school\'s data privacy policy.'),
       ]);

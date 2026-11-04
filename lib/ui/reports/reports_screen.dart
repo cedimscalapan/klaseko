@@ -4,7 +4,12 @@ import '../../core/export/form_data.dart';
 import '../../core/export/pdf_docs.dart';
 import '../../core/export/share.dart';
 import '../../core/export/xlsx_docs.dart';
+import '../../core/forms/template_fill.dart';
 import '../../core/models.dart';
+import '../forms/archive_info.dart';
+import '../forms/archive_screen.dart';
+import '../forms/fill_form.dart';
+import '../forms/templates_screen.dart';
 import '../grades/class_record_screen.dart';
 import '../pdf_preview_screen.dart';
 import '../theme.dart';
@@ -18,7 +23,8 @@ class _FormStatus {
   final int daysThisMonth;
   final int activities;
   final int gradesComplete;
-  _FormStatus(this.learners, this.noLrn, this.daysThisMonth, this.activities, this.gradesComplete);
+  final List<FormTemplate> layouts;
+  _FormStatus(this.learners, this.noLrn, this.daysThisMonth, this.activities, this.gradesComplete, this.layouts);
 }
 
 class ReportsScreen extends StatelessWidget {
@@ -35,12 +41,12 @@ class ReportsScreen extends StatelessWidget {
       final cards = await buildSf9Data(repo, store.profile, cls, learners, await loadAreas(cls));
       complete = cards.where((c) => c.generalAverage != null).length;
     }
-    return _FormStatus(learners.length, learners.where((l) => l.lrn.trim().isEmpty).length, days.length, (await repo.activities(cls.id)).length, complete);
+    return _FormStatus(learners.length, learners.where((l) => l.lrn.trim().isEmpty).length, days.length, (await repo.activities(cls.id)).length, complete, await repo.templates());
   }
 
   Future<void> _sf5Excel(BuildContext context) => withProgress(context, 'Making SF5...', () async {
         final d = await buildSf5Data(store.repo, store.profile, cls, await loadAreas(cls));
-        await saveAndShare(buildSf5Xlsx(d), 'SF5 ${cls.title}.xlsx', xlsxMime);
+        await shareAndArchive(ArchiveInfo(cls, 'sf5'), buildSf5Xlsx(d), 'SF5 ${cls.title}.xlsx', xlsxMime);
       });
 
   @override
@@ -63,13 +69,37 @@ class ReportsScreen extends StatelessWidget {
                 child: const Text('SF1, SF5 and SF9 are made by the class adviser. Turn on "This is my advisory class" in Edit class if this is your advisory section.'),
               ),
             ),
+          const SizedBox(height: 10),
+          NavRow(
+            icon: Icons.folder_rounded,
+            title: 'Forms archive',
+            subtitle: 'Everything you made for this class, sorted by term, week and form',
+            color: gold,
+            onTap: () => push(context, ArchiveScreen(cls: cls)),
+          ),
+          SectionTitle('Your own layouts', trailing: TextButton(onPressed: () => push(context, const TemplatesScreen()), child: const Text('Manage'))),
+          if (st.layouts.isEmpty)
+            NavRow(
+              icon: Icons.upload_file_rounded,
+              title: 'Use your school\'s own forms',
+              subtitle: 'Upload an Excel form once. KlaseKo fills it for every class.',
+              onTap: () => push(context, const TemplatesScreen()),
+            ),
+          for (final t in st.layouts)
+            if (advisory || (t.form != 'sf1' && t.form != 'sf5' && t.form != 'sf9'))
+              NavRow(
+                icon: Icons.table_view_rounded,
+                title: t.name,
+                subtitle: 'Fill your ${templateForms[t.form] ?? 'form'} layout · Excel',
+                onTap: () => fillAndShare(context, cls, t),
+              ),
           const SectionTitle('School forms'),
           if (advisory)
             _tile(context, Icons.how_to_reg_outlined, 'SF1 · School Register',
                 st.noLrn == 0 ? 'Ready: ${st.learners} learners, all with LRN · Excel' : 'Ready, but ${st.noLrn} of ${st.learners} learners have no LRN yet · Excel', () async {
               await withProgress(context, 'Making SF1...', () async {
                 final learners = await store.repo.learners(cls.id);
-                await saveAndShare(buildSf1Xlsx(store.profile, cls, learners), 'SF1 ${cls.title}.xlsx', xlsxMime);
+                await shareAndArchive(ArchiveInfo(cls, 'sf1'), buildSf1Xlsx(store.profile, cls, learners), 'SF1 ${cls.title}.xlsx', xlsxMime);
               });
             }),
           _tile(context, Icons.calendar_month_outlined, 'SF2 · Daily Attendance Report',
@@ -82,6 +112,7 @@ class ReportsScreen extends StatelessWidget {
                 context,
                 PdfPreviewScreen(
                   title: 'SF5',
+                  archive: ArchiveInfo(cls, 'sf5'),
                   fileName: 'SF5 ${cls.title}.pdf',
                   build: () async => buildSf5Pdf(await buildSf5Data(store.repo, store.profile, cls, await loadAreas(cls))),
                 ),
@@ -93,7 +124,7 @@ class ReportsScreen extends StatelessWidget {
           _tile(context, Icons.table_view_outlined, 'Class record (Excel)', '${st.activities} activities, with PS, WS, initial and term grades', () async {
             await withProgress(context, 'Making the class record...', () async {
               final d = await loadRecord(cls);
-              await saveAndShare(buildClassRecordXlsx(store.profile, d.engine.cls, d.learners, d.engine), 'Class Record ${cls.subject} ${cls.title}.xlsx', xlsxMime);
+              await shareAndArchive(ArchiveInfo(cls, 'record'), buildClassRecordXlsx(store.profile, d.engine.cls, d.learners, d.engine), 'Class Record ${cls.subject} ${cls.title}.xlsx', xlsxMime);
             });
           }),
           _tile(context, Icons.summarize_outlined, 'Summary of grades (PDF)', 'Term grades, final grade, descriptor and remarks', () async {
@@ -101,6 +132,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               PdfPreviewScreen(
                 title: 'Summary of grades',
+                archive: ArchiveInfo(cls, 'grades'),
                 fileName: 'Grades ${cls.subject} ${cls.title}.pdf',
                 build: () async {
                   final d = await loadRecord(cls);

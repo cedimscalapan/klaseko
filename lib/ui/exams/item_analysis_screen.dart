@@ -5,6 +5,7 @@ import '../../core/export/pdf_docs.dart';
 import '../../core/export/share.dart';
 import '../../core/export/xlsx_docs.dart';
 import '../../core/models.dart';
+import '../forms/archive_info.dart';
 import '../pdf_preview_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -34,6 +35,7 @@ class ItemAnalysisScreen extends StatelessWidget {
                       context,
                       PdfPreviewScreen(
                         title: 'Item analysis',
+                        archive: ArchiveInfo(b.cls, 'analysis', term: b.exam.term),
                         fileName: 'Item analysis ${b.exam.title}.pdf',
                         build: () => buildItemAnalysisPdf(profile: store.profile, cls: b.cls, exam: b.exam, stats: s, enrolled: b.learners.length),
                       ),
@@ -41,7 +43,7 @@ class ItemAnalysisScreen extends StatelessWidget {
                   } else {
                     await withProgress(context, 'Making the Excel file...', () async {
                       final bytes = buildItemAnalysisXlsx(store.profile, b.cls, b.exam, s, b.learners, b.responses, b.items);
-                      await saveAndShare(bytes, 'Item analysis ${b.exam.title}.xlsx', xlsxMime);
+                      await shareAndArchive(ArchiveInfo(b.cls, 'analysis', term: b.exam.term), bytes, 'Item analysis ${b.exam.title}.xlsx', xlsxMime);
                     });
                   }
                 },

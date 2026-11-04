@@ -8,6 +8,7 @@ import '../../core/export/xlsx_docs.dart';
 import '../../core/grading.dart';
 import '../../core/models.dart';
 import '../exams/exam_detail_screen.dart';
+import '../forms/archive_info.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'score_entry_screen.dart';
@@ -43,7 +44,7 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
   Future<void> _export(RecordData d) async {
     await withProgress(context, 'Making the class record...', () async {
       final bytes = buildClassRecordXlsx(store.profile, d.engine.cls, d.learners, d.engine);
-      await saveAndShare(bytes, 'Class Record ${widget.cls.subject} ${widget.cls.title}.xlsx', xlsxMime);
+      await shareAndArchive(ArchiveInfo(widget.cls, 'record'), bytes, 'Class Record ${widget.cls.subject} ${widget.cls.title}.xlsx', xlsxMime);
     });
   }
 

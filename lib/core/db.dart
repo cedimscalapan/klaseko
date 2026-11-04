@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,8 +17,16 @@ int now() => DateTime.now().millisecondsSinceEpoch;
 
 const _tables = [
   'classes', 'learners', 'attendance', 'activities', 'scores', 'exams', 'items', 'responses',
-  'overrides', 'sf9', 'sf9_values', 'settings',
+  'overrides', 'sf9', 'sf9_values', 'settings', 'form_templates',
 ];
+
+/// Tables added after the first version. The archive holds made files, which can be made again, so
+/// it stays out of backups.
+Future<void> _createFormTables(Database db) async {
+  await db.execute('CREATE TABLE IF NOT EXISTS form_templates(id TEXT PRIMARY KEY, form TEXT, name TEXT, mapping TEXT, created INTEGER)');
+  await db.execute('''CREATE TABLE IF NOT EXISTS form_archive(id TEXT PRIMARY KEY, class_id TEXT, class_title TEXT, subject TEXT, sy TEXT,
+    form TEXT, term INTEGER, period TEXT, title TEXT, mime TEXT, created INTEGER)''');
+}
 
 /// All data lives in one SQLCipher-encrypted SQLite file on the phone.
 /// The key is generated once and kept in the Android Keystore / iOS Keychain.
@@ -32,7 +43,7 @@ class Repo {
       await storage.write(key: 'db_key', value: key);
     }
     final path = p.join(await getDatabasesPath(), 'klaseko.db');
-    final db = await openDatabase(path, password: key, version: 1, onCreate: (db, v) async {
+    final db = await openDatabase(path, password: key, version: 2, onUpgrade: (db, from, to) => _createFormTables(db), onCreate: (db, v) async {
       final b = db.batch();
       b.execute('''CREATE TABLE classes(id TEXT PRIMARY KEY, sy TEXT, grade TEXT, section TEXT, subject TEXT,
         preset TEXT, ww REAL, pt REAL, ex REAL, ex_split INTEGER, transmute TEXT, mode TEXT, advisory INTEGER,
@@ -62,6 +73,7 @@ class Repo {
         PRIMARY KEY(learner_id, behavior, term))''');
       b.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)');
       await b.commit(noResult: true);
+      await _createFormTables(db);
     });
     return Repo._(db);
   }
@@ -369,12 +381,83 @@ class Repo {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  // ---------- form layouts and archive ----------
+  Future<Directory> _filesIn(String name) async {
+    final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'forms', name));
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  Future<File> _templateFile(String id) async => File(p.join((await _filesIn('templates')).path, '$id.xlsx'));
+
+  Future<File> _archiveFile(String id) async => File(p.join((await _filesIn('archive')).path, id));
+
+  Future<List<FormTemplate>> templates({String? form}) async {
+    final rows = form == null ? await db.query('form_templates', orderBy: 'created') : await db.query('form_templates', where: 'form = ?', whereArgs: [form], orderBy: 'created');
+    return rows.map(FormTemplate.fromMap).toList();
+  }
+
+  /// Saves a layout. [bytes] is the uploaded file, given the first time.
+  Future<void> saveTemplate(FormTemplate t, Uint8List? bytes) async {
+    if (bytes != null) await (await _templateFile(t.id)).writeAsBytes(bytes, flush: true);
+    await db.insert('form_templates', t.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Uint8List?> templateBytes(FormTemplate t) async {
+    final f = await _templateFile(t.id);
+    return await f.exists() ? f.readAsBytes() : null;
+  }
+
+  Future<void> deleteTemplate(FormTemplate t) async {
+    await db.delete('form_templates', where: 'id = ?', whereArgs: [t.id]);
+    final f = await _templateFile(t.id);
+    if (await f.exists()) await f.delete();
+  }
+
+  /// Files a made form. The same form made again replaces its older copy.
+  Future<void> saveArchive(ArchiveEntry e, Uint8List bytes) async {
+    final same = await db.query('form_archive',
+        columns: ['id'],
+        where: 'class_id = ? AND form = ? AND title = ? AND period = ? AND sy = ? AND mime = ?',
+        whereArgs: [e.classId, e.form, e.title, e.period, e.sy, e.mime]);
+    final id = same.isEmpty ? newId() : same.first['id'] as String;
+    await (await _archiveFile(id)).writeAsBytes(bytes, flush: true);
+    await db.insert('form_archive', e.toMap(id), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<ArchiveEntry>> archiveEntries({String? classId}) async {
+    final rows = classId == null
+        ? await db.query('form_archive', orderBy: 'created DESC')
+        : await db.query('form_archive', where: 'class_id = ?', whereArgs: [classId], orderBy: 'created DESC');
+    return rows.map(ArchiveEntry.fromMap).toList();
+  }
+
+  Future<Uint8List?> archiveBytes(ArchiveEntry e) async {
+    final f = await _archiveFile(e.id);
+    return await f.exists() ? f.readAsBytes() : null;
+  }
+
+  Future<void> setArchiveTerm(String id, int? term) => db.update('form_archive', {'term': term}, where: 'id = ?', whereArgs: [id]);
+
+  Future<void> deleteArchive(ArchiveEntry e) async {
+    await db.delete('form_archive', where: 'id = ?', whereArgs: [e.id]);
+    final f = await _archiveFile(e.id);
+    if (await f.exists()) await f.delete();
+  }
+
   // ---------- backup ----------
   Future<String> exportJson() async {
     final data = <String, Object?>{'app': 'KlaseKo', 'version': 1, 'exported': DateTime.now().toIso8601String()};
     for (final t in _tables) {
       data[t] = await db.query(t);
     }
+    // The layouts themselves, so a restored phone can still fill them.
+    final files = <String, String>{};
+    for (final t in await templates()) {
+      final bytes = await templateBytes(t);
+      if (bytes != null) files[t.id] = base64Encode(bytes);
+    }
+    data['template_files'] = files;
     return jsonEncode(data);
   }
 
@@ -390,13 +473,21 @@ class Repo {
         }
       }
     });
+    final files = data['template_files'];
+    if (files is Map) {
+      for (final e in files.entries) {
+        await (await _templateFile(e.key as String)).writeAsBytes(base64Decode(e.value as String), flush: true);
+      }
+    }
   }
 
   Future<void> wipe() async {
     await db.transaction((t) async {
-      for (final table in _tables) {
+      for (final table in [..._tables, 'form_archive']) {
         await t.delete(table);
       }
     });
+    final forms = Directory(p.join((await getApplicationSupportDirectory()).path, 'forms'));
+    if (await forms.exists()) await forms.delete(recursive: true);
   }
 }

@@ -433,3 +433,74 @@ class SchoolProfile {
   String termLabel(int t) => terms == 4 ? 'Q$t' : 'T$t';
   String termName(int t) => terms == 4 ? 'Quarter $t' : 'Term $t';
 }
+
+/// A teacher's own Excel layout of a form. [mapping] says which data goes in which cell.
+class FormTemplate {
+  final String id;
+  final String form;
+  String name;
+  String mapping;
+  final int created;
+  FormTemplate({required this.id, required this.form, required this.name, required this.mapping, required this.created});
+
+  Map<String, Object?> toMap() => {'id': id, 'form': form, 'name': name, 'mapping': mapping, 'created': created};
+  factory FormTemplate.fromMap(Map<String, Object?> m) =>
+      FormTemplate(id: m['id'] as String, form: m['form'] as String, name: m['name'] as String, mapping: m['mapping'] as String, created: m['created'] as int);
+}
+
+/// A form the teacher has made, filed for finding again.
+class ArchiveEntry {
+  final String id;
+  final String classId;
+  final String classTitle;
+  final String subject;
+  final String sy;
+  final String form;
+  final int? term;
+  final String period;
+  final String title;
+  final String mime;
+  final int created;
+  const ArchiveEntry({
+    required this.id,
+    required this.classId,
+    required this.classTitle,
+    required this.subject,
+    required this.sy,
+    required this.form,
+    this.term,
+    this.period = '',
+    required this.title,
+    required this.mime,
+    required this.created,
+  });
+
+  Map<String, Object?> toMap(String id) => {
+        'id': id,
+        'class_id': classId,
+        'class_title': classTitle,
+        'subject': subject,
+        'sy': sy,
+        'form': form,
+        'term': term,
+        'period': period,
+        'title': title,
+        'mime': mime,
+        'created': created,
+      };
+
+  factory ArchiveEntry.fromMap(Map<String, Object?> m) => ArchiveEntry(
+        id: m['id'] as String,
+        classId: m['class_id'] as String,
+        classTitle: m['class_title'] as String,
+        subject: m['subject'] as String,
+        sy: m['sy'] as String,
+        form: m['form'] as String,
+        term: m['term'] as int?,
+        period: (m['period'] ?? '') as String,
+        title: m['title'] as String,
+        mime: m['mime'] as String,
+        created: m['created'] as int,
+      );
+}
+

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/export/form_data.dart';
 import '../../core/export/pdf_docs.dart';
 import '../../core/models.dart';
+import '../forms/archive_info.dart';
 import '../pdf_preview_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -32,6 +33,7 @@ class Sf9Screen extends StatelessWidget {
       context,
       PdfPreviewScreen(
         title: 'SF9 report cards',
+        archive: ArchiveInfo(cls, 'sf9'),
         fileName: 'SF9 $name.pdf',
         build: () async => buildSf9Pdf(await buildSf9Data(store.repo, store.profile, cls, learners, areas)),
       ),

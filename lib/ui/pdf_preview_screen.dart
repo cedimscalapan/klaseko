@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../core/export/share.dart';
+import 'forms/archive_info.dart';
 
 /// Shows a generated PDF with Print and Share buttons. Printing uses the phone's own print
 /// service (Wi-Fi or USB printers, or Save as PDF), so no internet is needed.
 class PdfPreviewScreen extends StatefulWidget {
-  const PdfPreviewScreen({super.key, required this.title, required this.fileName, required this.build});
+  const PdfPreviewScreen({super.key, required this.title, required this.fileName, required this.build, this.archive});
+
+  /// Where this form is filed in the archive once it is made.
+  final ArchiveInfo? archive;
   final String title;
   final String fileName;
   final Future<Uint8List> Function() build;
@@ -18,7 +22,14 @@ class PdfPreviewScreen extends StatefulWidget {
 }
 
 class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
-  late final Future<Uint8List> _bytes = widget.build();
+  late final Future<Uint8List> _bytes = _make();
+
+  Future<Uint8List> _make() async {
+    final bytes = await widget.build();
+    final info = widget.archive;
+    if (info != null) await archiveForm(info, widget.fileName, bytes, pdfMime);
+    return bytes;
+  }
 
   @override
   Widget build(BuildContext context) {

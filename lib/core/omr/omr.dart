@@ -13,8 +13,9 @@ import 'sheet_layout.dart';
 ///  1. Lighting is flattened (shadows and uneven light removed).
 ///  2. Eight coded markers (corners and edge middles) are found in any rotation. Each one says which
 ///     marker it is and which way is up, so any two visible markers place the whole sheet. Parts of
-///     the paper may be outside the photo as long as every bubble is inside it. A close-up with no
-///     markers at all is placed from the grid of bubbles and the item numbers printed beside them.
+///     the paper may be outside the photo as long as every bubble is inside it. A photo of just the
+///     bubbles is placed from the grid they form; the way up comes from the item numbers if they are
+///     in view, otherwise from the small letters printed inside the empty bubbles.
 ///  3. Each item is locked onto its printed bubble outlines, which corrects small position errors.
 ///     If the outlines are not found where expected, the photo is refused.
 ///  4. Marks are judged against this sheet's own paper level and this learner's own shading, so
@@ -62,10 +63,10 @@ class OmrResult {
   factory OmrResult.fail(String message) => OmrResult(ok: false, error: message);
 }
 
-const _retakeMarkers = 'The answer sheet was not found. Fit all the bubbles and their item numbers in the photo, in good light, then try again.';
-const _retakeGrid = 'The bubbles were found, but not which items they are. Fit all the bubbles and their item numbers in the photo, or include two of the black markers.';
+const _retakeMarkers = 'The bubbles could not be read. Fit all the bubbles in the photo, in good light, then try again.';
+const _retakeGrid = 'The bubbles were found, but not which way is up. Move a little closer, or include the item numbers in the photo.';
 const _retakeFit = 'The sheet could not be lined up. Keep the paper flat and the phone steady, then try again.';
-const _outsidePhoto = 'Part of the answers is outside the photo. Move the phone back a little so all the bubbles and their item numbers are in view.';
+const _outsidePhoto = 'Part of the answers is outside the photo. Move the phone back a little so all the bubbles are in view.';
 const _retakeOutlines = 'The bubbles did not line up with the sheet. Hold the phone straight above the paper, keep it flat, and try again.';
 
 OmrResult readAnswerSheet(OmrRequest req) {
@@ -501,11 +502,12 @@ class _GridFit {
   _GridFit(this.hom, [this.error]);
 }
 
-/// Places the sheet from a close-up that shows no markers. The bubble outlines (and shaded
-/// bubbles) form a regular grid: four choices across and one row per item. Every way that grid
-/// could sit on the sheet is tried (which way is up, which column of items, which rows), and a
-/// placement is used only when it is the single one where every item's printed outlines are found
-/// where expected and every item number is printed to the left of its row.
+/// Places the sheet from a photo of just the bubbles. Their outlines (and shaded bubbles) form a
+/// regular grid: four choices across and one row per item. Every way that grid could sit on the
+/// sheet is tried (which way is up, which column of items, which rows), and only placements where
+/// every item's printed outlines are found are kept. The grid looks the same upside down, so when
+/// more than one is left, the item numbers or the printed letters must clearly pick one. If they
+/// cannot, the photo is refused: a wrong way up would reverse every answer.
 _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
   if (n == 0) return _GridFit(null);
   // 1. Round blobs of one common size: empty outlines and shaded bubbles.
@@ -518,7 +520,8 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
     final fill = b.count / (bw * bh);
     if (fill < 0.08 || fill > 0.95) continue;
     if ((b.cx - (b.minX + b.maxX) / 2).abs() > 0.2 * bw || (b.cy - (b.minY + b.maxY) / 2).abs() > 0.2 * bh) continue;
-    cands.add((b.cx, b.cy, (bw + bh) / 2));
+    // The middle of the box, not of the ink: a printed outline can break in a small photo.
+    cands.add(((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (bw + bh) / 2));
   }
   var most = 0;
   var size = 0.0;
@@ -646,14 +649,12 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
           src.add(SheetLayout.itemBubble(block * SheetLayout.rowsPerColumn + top + row, c));
           dst.add(pts[i]);
         }
-        final hom = _solveHomography(src, dst);
-        if (hom == null || !_fitsWithin(hom, src, dst, 1.2)) continue;
+        final hom = _fitSkippingStrays(src, dst, 1.2);
+        if (hom == null) continue;
         if (!_itemsInside(hom, n, w, h)) {
           outside = true;
           continue;
         }
-        // Wrong way up or wrong column: the item numbers are not where this placement expects them.
-        if (_labelsFound(im, hom, n, thr) < n * 0.5) continue;
         final regs = [
           for (var i = 0; i < n; i++)
             _register(im, hom, [for (var c = 0; c < SheetLayout.choices; c++) SheetLayout.itemBubble(i, c)], SheetLayout.bubbleR)
@@ -661,7 +662,7 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
         final scores = [for (final r in regs) r.score];
         final med = _median(scores);
         if (med < 0.06 || scores.any((s) => s < med * 0.4) || regs.any((r) => sqrt(r.dx * r.dx + r.dy * r.dy) > 1.25)) continue;
-        // Refit on every item's outlines, then require the item numbers beside the rows.
+        // Refit on every item's outlines.
         final src2 = <Pt>[], dst2 = <Pt>[];
         for (var i = 0; i < n; i++) {
           for (var c = 0; c < SheetLayout.choices; c++) {
@@ -671,14 +672,31 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
           }
         }
         final refined = _solveHomography(src2, dst2);
-        if (refined == null || _labelsFound(im, refined, n, thr) < n * 0.8) continue;
-        passed.add(refined);
+        if (refined != null) passed.add(refined);
       }
     }
   }
+  if (passed.isEmpty) return _GridFit(null, outside ? _outsidePhoto : _retakeMarkers);
   if (passed.length == 1) return _GridFit(passed.first);
-  if (passed.isEmpty && outside) return _GridFit(null, _outsidePhoto);
+  final numbered = [for (final p in passed) if (_labelsFound(im, p, n, thr) >= n * 0.8) p];
+  if (numbered.length == 1) return _GridFit(numbered.first);
+  final scores = [for (final p in passed) _letterMatch(im, p, n)];
+  final sorted = [...scores]..sort();
+  final best = sorted.last;
+  if (best >= 0.6 && best - sorted[sorted.length - 2] >= 0.15) return _GridFit(passed[scores.indexOf(best)]);
   return _GridFit(null, _retakeGrid);
+}
+
+/// Fits the sheet, leaving out up to a fifth of the points if they are far off (a mis-seen bubble).
+_Homography? _fitSkippingStrays(List<Pt> src, List<Pt> dst, double tolMm) {
+  final first = _solveHomography(src, dst);
+  if (first == null) return null;
+  final keep = [for (var i = 0; i < src.length; i++) if (_fitsWithin(first, [src[i]], [dst[i]], tolMm)) i];
+  if (keep.length == src.length) return first;
+  if (keep.length < src.length * 0.8) return null;
+  final s2 = [for (final i in keep) src[i]], d2 = [for (final i in keep) dst[i]];
+  final second = _solveHomography(s2, d2);
+  return second != null && _fitsWithin(second, s2, d2, tolMm) ? second : null;
 }
 
 /// True when every point lands within [tolMm] of where the fitted sheet puts it.
@@ -696,8 +714,11 @@ bool _itemsInside(_Homography hom, int n, int w, int h) {
   for (var i = 0; i < n; i++) {
     for (final c in const [0, SheetLayout.choices - 1]) {
       final b = SheetLayout.itemBubble(i, c);
-      final q = hom.map(b.x, b.y);
-      if (q.x < 3 || q.y < 3 || q.x > w - 4 || q.y > h - 4) return false;
+      // The whole bubble, not just its middle, so a cut-off mark is never read as a light one.
+      for (final (dx, dy) in const [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)]) {
+        final q = hom.map(b.x + dx * SheetLayout.bubbleR, b.y + dy * SheetLayout.bubbleR);
+        if (q.x < 0 || q.y < 0 || q.x > w - 1 || q.y > h - 1) return false;
+      }
     }
   }
   return true;
@@ -720,6 +741,91 @@ int _labelsFound(_Img im, _Homography hom, int n, int thr) {
     if (dark >= total * 0.04) found++;
   }
   return found;
+}
+
+/// The letters A, B, C and D printed inside the bubbles, on a 0.2 mm grid (0 = paper, 9 = full ink).
+const bubbleLetterGlyphs = [
+  ['0000000000', '0000530000', '0001880000', '0005473000', '0009137000', '0037009100', '0068779500', '0091113900', '0460000830', '0420000340', '0000000000'],
+  ['000000000', '046664000', '066336800', '064000910', '065113800', '069889500', '064000830', '064000650', '066334920', '046665200', '000000000'],
+  ['0000000000', '0003675000', '0067226800', '0380000620', '0550000000', '0640000000', '0550000100', '0280000740', '0077226800', '0004675000', '0000000000'],
+  ['000000000', '066664000', '094336800', '091000740', '091000370', '091000380', '091000470', '091000740', '094336800', '066664000', '000000000'],
+];
+
+/// How well the empty bubbles show the letter this placement expects there, from -1 to 1. The right
+/// way up scores about 0.8 and upside down about 0.5, even in photos of a light printout.
+double _letterMatch(_Img im, _Homography hom, int n) {
+  const cell = 0.2, size = 21;
+  final patches = <Float64List>[];
+  final letters = <int>[];
+  final fills = <double>[];
+  for (var i = 0; i < n; i++) {
+    for (var c = 0; c < SheetLayout.choices; c++) {
+      final b = SheetLayout.itemBubble(i, c);
+      final p = Float64List(size * size);
+      var sum = 0.0;
+      for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
+          final q = hom.map(b.x + (x - size ~/ 2) * cell, b.y + (y - size ~/ 2) * cell);
+          final v = im.dark(q.x.round(), q.y.round());
+          p[y * size + x] = v;
+          sum += v;
+        }
+      }
+      patches.add(p);
+      letters.add(c);
+      fills.add(sum / p.length);
+    }
+  }
+  final usual = _median(fills);
+  var total = 0.0;
+  var count = 0;
+  for (var k = 0; k < patches.length; k++) {
+    if (fills[k] > usual * 2 + 0.05) continue; // a shaded bubble hides its letter
+    total += _bestGlyphMatch(patches[k], size, bubbleLetterGlyphs[letters[k]]);
+    count++;
+  }
+  return count == 0 ? 0 : total / count;
+}
+
+/// Best normalized correlation of a glyph at any position in a patch.
+double _bestGlyphMatch(Float64List patch, int size, List<String> glyph) {
+  final gh = glyph.length, gw = glyph.first.length;
+  final g = Float64List(gh * gw);
+  var gMean = 0.0;
+  for (var y = 0; y < gh; y++) {
+    for (var x = 0; x < gw; x++) {
+      g[y * gw + x] = glyph[y].codeUnitAt(x) - 48.0;
+      gMean += g[y * gw + x];
+    }
+  }
+  gMean /= g.length;
+  var gNorm = 0.0;
+  for (var i = 0; i < g.length; i++) {
+    g[i] -= gMean;
+    gNorm += g[i] * g[i];
+  }
+  var best = -1.0;
+  for (var oy = 0; oy + gh <= size; oy++) {
+    for (var ox = 0; ox + gw <= size; ox++) {
+      var mean = 0.0;
+      for (var y = 0; y < gh; y++) {
+        for (var x = 0; x < gw; x++) {
+          mean += patch[(oy + y) * size + ox + x];
+        }
+      }
+      mean /= g.length;
+      var cross = 0.0, norm = 0.0;
+      for (var y = 0; y < gh; y++) {
+        for (var x = 0; x < gw; x++) {
+          final d = patch[(oy + y) * size + ox + x] - mean;
+          cross += d * g[y * gw + x];
+          norm += d * d;
+        }
+      }
+      if (norm > 1e-9 && cross / sqrt(norm * gNorm) > best) best = cross / sqrt(norm * gNorm);
+    }
+  }
+  return best;
 }
 
 /// Projective map from sheet millimetres to image pixels, fitted by least squares on normalised

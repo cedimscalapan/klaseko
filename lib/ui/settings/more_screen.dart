@@ -221,7 +221,7 @@ class PrintTipsScreen extends StatelessWidget {
         _p('Use the paper size set in your school profile (short, long or A4). Black ink only; grayscale is fine.'),
         _p('Photocopies work if the circles and item numbers stay clear. Avoid copies that are too light.'),
         _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black markers.'),
-        _p('When scanning, lay the sheet flat in good light and avoid shadows from your phone. You do not need to line anything up: fit all the bubbles and their item numbers in the photo. Include the learner number too, and the app will know whose paper it is.'),
+        _p('When scanning, lay the sheet flat in good light and avoid shadows from your phone. You do not need to line anything up: just fit all the bubbles in the photo. Include the learner number too, and the app will know whose paper it is.'),
         _p('If a paper cannot be read, use "Check by tapping" for that learner.'),
       ]);
 }

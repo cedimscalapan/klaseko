@@ -17,6 +17,8 @@ Uint8List photo({
   double dy = 0,
   int pencil = 45,
   int seed = 1,
+  bool numbers = true,
+  bool letters = false,
 }) {
   const w = 1200, h = 1500;
   const pageW = 215.9, pageH = 279.4;
@@ -60,10 +62,17 @@ Uint8List photo({
             // Item number, right-aligned just left of choice A: one 1.6 mm wide digit per character.
             final lab = SheetLayout.itemLabel(i);
             final digits = '${i + 1}'.length;
-            if ((fy - lab.y).abs() < 1.3 && fx < lab.x + 2 && fx > lab.x + 2 - 1.6 * digits && ((lab.x + 2 - fx) % 1.6) < 0.4) v = 30;
+            if (numbers && (fy - lab.y).abs() < 1.3 && fx < lab.x + 2 && fx > lab.x + 2 - 1.6 * digits && ((lab.x + 2 - fx) % 1.6) < 0.4) v = 30;
             for (var c = 0; c < 4; c++) {
               final b = SheetLayout.itemBubble(i, c);
-              if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) bubble(b.x, b.y, SheetLayout.bubbleR, 'i$i:$c');
+              if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) {
+                bubble(b.x, b.y, SheetLayout.bubbleR, 'i$i:$c');
+                if (letters && !shaded.contains('i$i:$c')) {
+                  final g = bubbleLetterGlyphs[c];
+                  final row = ((fy - b.y) / 0.2 + g.length / 2).floor(), col = ((fx - b.x) / 0.2 + g.first.length / 2).floor();
+                  if (row >= 0 && row < g.length && col >= 0 && col < g.first.length) v = min(v, 228.0 - int.parse(g[row][col]) * 5);
+                }
+              }
             }
           }
         }
@@ -116,10 +125,10 @@ void main() {
   // centred on page point (61.95, 141.7) mm, the middle of items 1-10; at 16 px/mm it shows about
   // 75 x 94 mm of the sheet.
   final ten = answers.sublist(0, 10);
-  Uint8List closeUp(List<int> a, {double rotDeg = 0, double pxPerMm = 16, int pencil = 45}) {
+  Uint8List closeUp(List<int> a, {double rotDeg = 0, double pxPerMm = 16, int pencil = 45, bool numbers = true, bool letters = false}) {
     final r = rotDeg * pi / 180, ca = cos(r), sa = sin(r);
     final u = (-46 * ca - 2 * sa) * pxPerMm, v = (-46 * sa + 2 * ca) * pxPerMm;
-    return photo(answers: a, learnerNum: 0, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, pencil: pencil);
+    return photo(answers: a, learnerNum: 0, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, pencil: pencil, numbers: numbers, letters: letters);
   }
 
   void expectCloseUp(OmrResult r) {
@@ -142,6 +151,23 @@ void main() {
 
   test('reads a sideways close-up', () {
     expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: -88, pxPerMm: 14), 10)));
+  });
+
+  test('reads just the bubbles, without item numbers', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: 3, numbers: false, letters: true), 10)));
+  });
+
+  test('reads just the bubbles upside down, with light pencil', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: 178, pencil: 150, numbers: false, letters: true), 10)));
+  });
+
+  test('reads just the bubbles sideways', () {
+    expectCloseUp(readAnswerSheet(OmrRequest(closeUp(ten, rotDeg: 92, pxPerMm: 14, numbers: false, letters: true), 10)));
+  });
+
+  test('refuses when nothing shows which way is up', () {
+    final r = readAnswerSheet(OmrRequest(closeUp(ten, numbers: false), 10));
+    expect(r.ok, isFalse);
   });
 
   test('refuses a close-up that leaves out some items', () {

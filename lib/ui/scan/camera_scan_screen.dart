@@ -192,7 +192,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'Fit all the bubbles and their item numbers in the photo. Any angle works.',
+                    _lastError ?? 'Fit all the bubbles in the photo. Any angle works.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),

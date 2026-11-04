@@ -43,6 +43,8 @@ class SheetLayout {
     56045, 27661, 8202, 60411, 46592, 13035, 39920, 44485,
     18585, 35360, 7850, 20771, 4598, 33532, 65227, 45022,
   ];
+  static bool markerBit(int id, int row, int col) => (markerCodes[id] >> (15 - (row * 4 + col))) & 1 == 1;
+
   static const int maxItems = 60;
   static const int rowsPerColumn = 20;
   static const int choices = 4;

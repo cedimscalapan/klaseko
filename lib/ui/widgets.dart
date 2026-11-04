@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/models.dart';
 import '../core/store.dart';
 import 'theme.dart';
 
@@ -429,11 +430,61 @@ Future<T?> withProgress<T>(BuildContext context, String message, Future<T> Funct
   try {
     return await job();
   } catch (e) {
-    if (context.mounted) toast(context, 'Could not finish: $e');
+    if (context.mounted) toast(context, e is FormatException ? e.message : 'That did not work. Please try again.');
     return null;
   } finally {
     nav.pop();
   }
+}
+
+/// A screen title with the class under it, so the teacher always sees which class this is.
+class ClassTitle extends StatelessWidget {
+  const ClassTitle(this.title, this.cls, {super.key});
+  final String title;
+  final SchoolClass cls;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text(title, overflow: TextOverflow.ellipsis),
+        Text('${cls.subject} · ${cls.title}', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: mutedText(context))),
+      ]);
+}
+
+/// The grade as a short badge: "8", or "K" for Kindergarten.
+String gradeShort(String grade) {
+  final digits = grade.replaceAll(RegExp(r'[^0-9]'), '');
+  return digits.isEmpty ? 'K' : digits;
+}
+
+/// Lets the teacher choose a class, or goes straight on when there is only one.
+void pickClass(BuildContext context, List<SchoolClass> classes, String title, void Function(SchoolClass) open) {
+  if (classes.length == 1) {
+    open(classes.first);
+    return;
+  }
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: ListView(shrinkWrap: true, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text(title, style: Theme.of(ctx).textTheme.titleLarge)),
+        for (var i = 0; i < classes.length; i++)
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: palette.classColors[i % palette.classColors.length].withAlpha(30),
+              child: Text(gradeShort(classes[i].grade), style: TextStyle(color: palette.classColors[i % palette.classColors.length], fontWeight: FontWeight.w800)),
+            ),
+            title: Text(classes[i].title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(classes[i].subject),
+            onTap: () {
+              Navigator.pop(ctx);
+              open(classes[i]);
+            },
+          ),
+        const SizedBox(height: 12),
+      ]),
+    ),
+  );
 }
 
 Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));

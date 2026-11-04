@@ -28,7 +28,7 @@ class _Sf2ScreenState extends State<Sf2Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SF2 · Attendance')),
+      appBar: AppBar(title: ClassTitle('SF2 · Attendance', widget.cls)),
       body: Column(children: [
         Row(children: [
           IconButton(onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left)),

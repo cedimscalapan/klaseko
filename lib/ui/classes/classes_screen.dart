@@ -47,7 +47,7 @@ class ClassesScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    child: Text(c.grade.replaceAll(RegExp(r'[^0-9]'), ''), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                    child: Text(gradeShort(c.grade), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

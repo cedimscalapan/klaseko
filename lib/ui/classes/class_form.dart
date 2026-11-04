@@ -4,6 +4,7 @@ import '../../core/db.dart';
 import '../../core/grading.dart';
 import '../../core/models.dart';
 import '../widgets.dart';
+import 'class_detail_screen.dart';
 
 const gradeLevels = ['Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 
@@ -62,6 +63,23 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
     _mode = c?.mode ?? 'numeric';
     _advisory = c?.advisory ?? false;
     _presetTouched = c != null;
+    if (c == null) _startFromLastClass();
+  }
+
+  /// Teachers often have several sections of one subject, so a new class starts like the last one.
+  Future<void> _startFromLastClass() async {
+    final classes = await store.repo.classes();
+    if (classes.isEmpty || !mounted || _subject.text.isNotEmpty) return;
+    setState(() {
+      _setGrade(classes.last.grade);
+      _subject.text = classes.last.subject;
+    });
+    _autoPreset();
+  }
+
+  void _setGrade(String grade) {
+    _grade = grade;
+    _mode = grade == 'Grade 1' || grade == 'Kindergarten' ? 'descriptive' : 'numeric';
   }
 
   @override
@@ -127,7 +145,13 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
       ..advisory = _advisory;
     await store.repo.saveClass(c);
     store.changed();
-    if (mounted) Navigator.pop(context, c);
+    if (!mounted) return;
+    if (widget.existing != null) {
+      Navigator.pop(context, c);
+    } else {
+      // The next step for a new class is adding its learners, which starts on the class page.
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ClassDetailScreen(classId: c.id)));
+    }
   }
 
   @override
@@ -143,16 +167,14 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
             decoration: const InputDecoration(labelText: 'Grade level'),
             items: [for (final g in gradeLevels) DropdownMenuItem(value: g, child: Text(g))],
             onChanged: (v) {
-              setState(() {
-                _grade = v!;
-                if (_grade == 'Grade 1' || _grade == 'Kindergarten') _mode = 'descriptive';
-              });
+              setState(() => _setGrade(v!));
               _autoPreset();
             },
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _section,
+            autofocus: !editing,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(labelText: 'Section *', hintText: 'e.g. Sampaguita'),
             validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter the section' : null,
@@ -190,71 +212,84 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
             title: const Text('This is my advisory class', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: const Text('Turns on SF1, SF2 and SF9 for this class.'),
           ),
-          const SectionTitle('Grading rules'),
-          DropdownButtonFormField<String>(
-            value: _preset,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Learning area weights'),
-            items: [
-              for (final p in weightPresets)
-                DropdownMenuItem(
-                  value: p.id,
-                  child: Text(p.id == 'custom' ? p.label : '${p.label} (${p.ww.toInt()}/${p.pt.toInt()}/${p.ex.toInt()})', overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (v) {
-              _presetTouched = true;
-              _applyPreset(v!);
-            },
-          ),
-          const SizedBox(height: 4),
-          Text('Source: ${presetById(_preset).group}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 12),
-          Row(children: [
-            for (final (label, value, setter) in [
-              ('Written Work %', _ww, (double v) => _ww = v),
-              ('Perf. Tasks %', _pt, (double v) => _pt = v),
-              ('Exams %', _ex, (double v) => _ex = v),
-            ])
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: TextFormField(
-                    key: ValueKey('$label$_preset'),
-                    initialValue: value.toStringAsFixed(0),
-                    enabled: _preset == 'custom',
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: label),
-                    onChanged: (v) => setState(() => setter(double.tryParse(v) ?? 0)),
-                  ),
-                ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            maintainState: true,
+            initiallyExpanded: _preset == 'custom',
+            title: const Text('Grading rules', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('WW ${_ww.toInt()} / PT ${_pt.toInt()} / EX ${_ex.toInt()} · ${_mode == 'descriptive' ? 'letter grades' : 'numerical grades'}. Set for you from the grade and subject.'),
+            children: [
+              const SizedBox(height: 4),
+              DropdownButtonFormField<String>(
+                value: _preset,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Learning area weights'),
+                items: [
+                  for (final p in weightPresets)
+                    DropdownMenuItem(
+                      value: p.id,
+                      child: Text(p.id == 'custom' ? p.label : '${p.label} (${p.ww.toInt()}/${p.pt.toInt()}/${p.ex.toInt()})', overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) {
+                  _presetTouched = true;
+                  _applyPreset(v!);
+                },
               ),
-          ]),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _exSplit,
-            onChanged: _preset == 'custom' ? (v) => setState(() => _exSplit = v) : null,
-            title: const Text('Split exams into ST1 30%, ST2 30%, Term Exam 40%'),
-            subtitle: const Text('Required by DO 015, s. 2026 for most learning areas.'),
-          ),
-          DropdownButtonFormField<String>(
-            value: _transmute,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Transmutation'),
-            items: [for (final e in transmuteLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))],
-            onChanged: (v) => setState(() => _transmute = v!),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _mode,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Report as'),
-            items: const [
-              DropdownMenuItem(value: 'numeric', child: Text('Numerical grades (Grades 2-12)')),
-              DropdownMenuItem(value: 'descriptive', child: Text('Letter grades A-E (Key Stage 1, Grade 1)')),
+              const SizedBox(height: 4),
+              Text('Source: ${presetById(_preset).group}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              if (_preset == 'custom') ...[
+                const SizedBox(height: 12),
+                Row(children: [
+                  for (final (label, value, setter) in [
+                    ('Written Work %', _ww, (double v) => _ww = v),
+                    ('Perf. Tasks %', _pt, (double v) => _pt = v),
+                    ('Exams %', _ex, (double v) => _ex = v),
+                  ])
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: TextFormField(
+                          key: ValueKey('$label$_preset'),
+                          initialValue: value.toStringAsFixed(0),
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(labelText: label),
+                          onChanged: (v) => setState(() => setter(double.tryParse(v) ?? 0)),
+                        ),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _exSplit,
+                  onChanged: (v) => setState(() => _exSplit = v),
+                  title: const Text('Split exams into ST1 30%, ST2 30%, Term Exam 40%'),
+                  subtitle: const Text('Required by DO 015, s. 2026 for most learning areas.'),
+                ),
+              ],
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _transmute,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Transmutation'),
+                items: [for (final e in transmuteLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))],
+                onChanged: (v) => setState(() => _transmute = v!),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _mode,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Report as'),
+                items: const [
+                  DropdownMenuItem(value: 'numeric', child: Text('Numerical grades (Grades 2-12)')),
+                  DropdownMenuItem(value: 'descriptive', child: Text('Letter grades A-E (Key Stage 1, Grade 1)')),
+                ],
+                onChanged: (v) => setState(() => _mode = v!),
+              ),
             ],
-            onChanged: (v) => setState(() => _mode = v!),
           ),
           const SizedBox(height: 24),
           FilledButton(onPressed: _save, child: Text(editing ? 'Save changes' : 'Create class')),

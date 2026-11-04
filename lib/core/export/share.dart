@@ -12,11 +12,12 @@ String safeFileName(String s) => s.replaceAll(RegExp(r'[^A-Za-z0-9 _.-]'), '').t
 
 /// Saves a generated file in the app's documents folder and opens the share sheet,
 /// so the teacher can save it to Files or Drive, or send it through Messenger or email.
-Future<File> saveAndShare(Uint8List bytes, String fileName, String mime) async {
+/// Returns false when the teacher closed the share sheet without choosing anything.
+Future<bool> saveAndShare(Uint8List bytes, String fileName, String mime) async {
   final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'exports'));
   if (!await dir.exists()) await dir.create(recursive: true);
   final file = File(p.join(dir.path, safeFileName(fileName)));
   await file.writeAsBytes(bytes, flush: true);
-  await Share.shareXFiles([XFile(file.path, mimeType: mime)], subject: fileName);
-  return file;
+  final result = await Share.shareXFiles([XFile(file.path, mimeType: mime)], subject: fileName);
+  return result.status != ShareResultStatus.dismissed;
 }

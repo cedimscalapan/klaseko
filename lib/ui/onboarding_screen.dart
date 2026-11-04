@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
   final _profile = SchoolProfile();
   final _formKey = GlobalKey<FormState>();
-  bool _sample = true;
+  bool _sample = false;
   bool _busy = false;
 
   Future<void> _finish() async {
@@ -67,10 +67,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 18),
         for (final f in const [
           [Icons.fact_check_outlined, 'Attendance in a few taps', 'Your SF2 fills itself every month.'],
-          [Icons.grid_on_outlined, 'Class record with DepEd rules', 'DO 015, s. 2026 weights, terms and transmutation built in.'],
-          [Icons.quiz_outlined, 'Exam maker and printable answer sheets', 'Test papers and personalized answer sheets as PDF.'],
-          [Icons.document_scanner_outlined, 'Check papers with the camera', 'Scores go straight to your class record.'],
-          [Icons.insights_outlined, 'MPS and item analysis', 'Least-mastered competencies in one tap.'],
+          [Icons.grid_on_outlined, 'Class record with DepEd rules', 'DO 015, s. 2026 weights and transmutation built in.'],
+          [Icons.document_scanner_outlined, 'Make exams and check papers with the camera', 'Scores go straight to your class record.'],
           [Icons.wifi_off_outlined, 'Works fully offline', 'Learner data stays encrypted on your phone.'],
         ])
           Padding(
@@ -95,10 +93,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: ListView(padding: const EdgeInsets.all(24), children: [
           const Text('Your school', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
-          Text('These details go on the header of your SF1, SF2, SF9 and reports. You can change them later in More.',
+          Text('These go on the header of your forms and reports. You can change them later in More.',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
-          ProfileFields(profile: _profile),
+          ProfileFields(profile: _profile, compact: true),
           const SizedBox(height: 20),
           Row(children: [
             Expanded(child: OutlinedButton(onPressed: () => setState(() => _step = 0), child: const Text('Back'))),
@@ -121,7 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _ready() => ListView(padding: const EdgeInsets.all(24), children: [
         const Text("You're all set", style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        Text('Add your first class from the Classes tab. Want to look around first?',
+        Text('Next, add your first class. Want to look around with practice data first?',
             style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         const SizedBox(height: 16),
         AppCard(

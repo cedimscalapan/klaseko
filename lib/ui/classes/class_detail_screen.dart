@@ -94,7 +94,7 @@ class ClassDetailScreen extends StatelessWidget {
               NavRow(
                 icon: Icons.person_add_alt_1_rounded,
                 title: 'Start here: add your learners',
-                subtitle: 'Paste the class list from SF1, LIS or Excel',
+                subtitle: 'Choose an Excel file, or paste the list from SF1 or LIS',
                 highlight: true,
                 onTap: () => push(context, ImportLearnersScreen(cls: c)),
               ),

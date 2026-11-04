@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models.dart';
+import '../classes/class_form.dart';
 import '../exams/exam_detail_screen.dart';
+import '../exams/exams_screen.dart';
+import '../exams/item_analysis_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'camera_scan_screen.dart';
@@ -37,6 +40,19 @@ class CheckHubScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Check papers')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final classes = await store.repo.classes();
+          if (!context.mounted) return;
+          if (classes.isEmpty) {
+            push(context, const ClassFormScreen());
+          } else {
+            pickClass(context, classes, 'New exam for which class?', (c) => showNewExamSheet(context, c));
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('New exam'),
+      ),
       body: Loader<List<_HubRow>>(
         load: _load,
         builder: (context, rows) {
@@ -44,11 +60,11 @@ class CheckHubScreen extends StatelessWidget {
             return const EmptyState(
               icon: Icons.document_scanner_outlined,
               title: 'No exams yet',
-              message: 'Open a class, go to Exams and quizzes, and make an exam. Print its answer sheets, then come back here to scan them.',
+              message: 'Tap New exam to make a quiz or exam. Print its answer sheets, then come back here to scan them.',
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             itemCount: rows.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
@@ -73,16 +89,32 @@ class CheckHubScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Row(children: [
-                    if (left > 0) Pill('$left left', color: lateAmber) else Pill('All checked', color: goodGreen),
+                    if (r.items == 0)
+                      Pill('No items yet', color: lateAmber)
+                    else if (left > 0)
+                      Pill('$left left', color: lateAmber)
+                    else
+                      Pill('All checked', color: goodGreen),
                     const Spacer(),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(minimumSize: const Size(40, 40)),
-                      onPressed: r.items == 0
-                          ? () => toast(context, 'Add the answer key to this exam first.')
-                          : () => push(context, CameraScanScreen(examId: r.exam.id)),
-                      icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                      label: const Text('Scan'),
-                    ),
+                    if (r.items == 0)
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(40, 40)),
+                        onPressed: () => push(context, ExamDetailScreen(examId: r.exam.id)),
+                        child: const Text('Add items'),
+                      )
+                    else if (left <= 0 && r.checked > 0)
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(40, 40)),
+                        onPressed: () => push(context, ItemAnalysisScreen(examId: r.exam.id)),
+                        child: const Text('See results'),
+                      )
+                    else
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(minimumSize: const Size(40, 40)),
+                        onPressed: () => push(context, CameraScanScreen(examId: r.exam.id)),
+                        icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                        label: const Text('Scan'),
+                      ),
                   ]),
                 ]),
               );

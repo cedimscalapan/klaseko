@@ -19,7 +19,7 @@ class ReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final advisory = cls.advisory;
     return Scaffold(
-      appBar: AppBar(title: const Text('Reports and school forms')),
+      appBar: AppBar(title: ClassTitle('Reports and school forms', cls)),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
         if (!advisory)
           Padding(

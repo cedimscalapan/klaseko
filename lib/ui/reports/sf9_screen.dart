@@ -47,7 +47,7 @@ class Sf9Screen extends StatelessWidget {
         final other = areas.where((a) => a.trim().toLowerCase() != cls.subject.trim().toLowerCase()).length;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('SF9 · Report cards'),
+            title: ClassTitle('SF9 · Report cards', cls),
             actions: [
               IconButton(
                 tooltip: 'Learning areas',

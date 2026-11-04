@@ -23,6 +23,10 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
   bool _dirty = false;
   bool _keyOnly = false;
 
+  /// Items added here whose correct answer has not been chosen yet. The database has no "no answer"
+  /// value, so these would be saved with A as correct: the teacher is asked first.
+  final Set<String> _unset = {};
+
   @override
   void initState() {
     super.initState();
@@ -57,10 +61,26 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
     }
     setState(() {
       for (var i = 0; i < count; i++) {
-        _items.add(_blank());
+        final item = _blank();
+        _items.add(item);
+        _unset.add(item.id);
       }
       _dirty = true;
     });
+  }
+
+  List<int> get _noAnswer => [for (var i = 0; i < _items.length; i++) if (_unset.contains(_items[i].id)) i + 1];
+
+  Future<bool> _okToSave() async {
+    final missing = _noAnswer;
+    if (missing.isEmpty) return true;
+    return confirm(
+      context,
+      title: missing.length == 1 ? '1 item has no correct answer yet' : '${missing.length} items have no correct answer yet',
+      message: 'Item ${missing.take(12).join(', ')}${missing.length > 12 ? '...' : ''}. If you save now, A will count as the correct answer.',
+      action: 'Save anyway',
+      danger: false,
+    );
   }
 
   Future<bool> _save() async {
@@ -77,7 +97,10 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final nav = Navigator.of(context);
-        if (_dirty) await _save();
+        if (_dirty) {
+          if (!await _okToSave()) return;
+          await _save();
+        }
         nav.pop();
       },
       child: Scaffold(
@@ -88,8 +111,10 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
             TextButton(
               onPressed: () async {
                 final nav = Navigator.of(context);
+                if (!await _okToSave()) return;
                 await _save();
-                if (mounted) toast(context, 'Saved. Checked papers were re-scored.');
+                final rescored = (await store.repo.responses(widget.exam.id)).isNotEmpty;
+                if (mounted) toast(context, rescored ? 'Saved. Checked papers were re-scored.' : 'Saved.');
                 nav.pop();
               },
               child: const Text('Save'),
@@ -104,16 +129,13 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 100), children: [
-                AppCard(
-                  child: SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _keyOnly,
-                    onChanged: (v) => setState(() => _keyOnly = v),
-                    title: const Text('Answer key only', style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: const Text('Turn on if your test is already printed. Just tap the correct letter for each item.'),
+                if (_items.isNotEmpty) ...[_keySwitch(), const SizedBox(height: 8)],
+                if (_noAnswer.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    child: Text(_noAnswer.length == 1 ? '1 item still needs a correct answer.' : '${_noAnswer.length} items still need a correct answer.',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: lateAmber)),
                   ),
-                ),
-                const SizedBox(height: 8),
                 if (_items.isEmpty) ...[
                   NavRow(
                     icon: Icons.file_download_rounded,
@@ -123,6 +145,8 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                     onTap: _import,
                   ),
                   const Center(child: Text('or start from blank items', style: TextStyle(fontSize: 13))),
+                  const SizedBox(height: 8),
+                  _keySwitch(),
                 ],
                 if (_items.isEmpty)
                   Padding(
@@ -141,6 +165,16 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
     );
   }
 
+  Widget _keySwitch() => AppCard(
+        child: SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _keyOnly,
+          onChanged: (v) => setState(() => _keyOnly = v),
+          title: const Text('Answer key only', style: TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: const Text('Turn on if your test is already printed. Just tap the correct letter for each item.'),
+        ),
+      );
+
   Widget _keyGrid() => AppCard(
         child: Column(children: [
           for (var i = 0; i < _items.length; i++)
@@ -153,8 +187,9 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                     padding: const EdgeInsets.only(right: 8),
                     child: _Bubble(
                       letter: 'ABCD'[c],
-                      selected: _items[i].answer == c,
+                      selected: _items[i].answer == c && !_unset.contains(_items[i].id),
                       onTap: () => setState(() {
+                        _unset.remove(_items[i].id);
                         _items[i].answer = c;
                         _items[i].type = 'mc';
                         _dirty = true;
@@ -187,7 +222,9 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
             PopupMenuButton<String>(
               onSelected: (v) => setState(() {
                 if (v == 'dup') {
-                  _items.insert(i + 1, ExamItem(id: newId(), examId: it.examId, idx: i + 1, type: it.type, question: it.question, choices: [...it.choices], answer: it.answer, competency: it.competency));
+                  final copy = ExamItem(id: newId(), examId: it.examId, idx: i + 1, type: it.type, question: it.question, choices: [...it.choices], answer: it.answer, competency: it.competency);
+                  if (_unset.contains(it.id)) _unset.add(copy.id);
+                  _items.insert(i + 1, copy);
                 } else if (v == 'up' && i > 0) {
                   _items.insert(i - 1, _items.removeAt(i));
                 } else if (v == 'down' && i < _items.length - 1) {
@@ -243,8 +280,9 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
               child: Row(children: [
                 _Bubble(
                   letter: 'ABCD'[c],
-                  selected: it.answer == c,
+                  selected: it.answer == c && !_unset.contains(it.id),
                   onTap: () => setState(() {
+                    _unset.remove(it.id);
                     it.answer = c;
                     _dirty = true;
                   }),

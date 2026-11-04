@@ -62,29 +62,41 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     if (mounted) toast(context, 'Added ${added.length} items to ${b.exam.title}.', success: true);
   }
 
-  void _printSheets(ExamBundle b) {
+  void _printMenu(ExamBundle b) {
+    void open(BuildContext ctx, VoidCallback action) {
+      Navigator.pop(ctx);
+      action();
+    }
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: ListView(shrinkWrap: true, children: [
           ListTile(
-            leading: const Icon(Icons.badge_outlined),
-            title: const Text('One sheet per learner'),
-            subtitle: Text('${b.learners.length} sheets with names and learner numbers already filled in. Fastest to scan.'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _openSheets(b, [for (final l in b.learners) SheetTarget(l)]);
-            },
+            leading: const Icon(Icons.article_outlined),
+            title: const Text('Test paper'),
+            subtitle: const Text('The questions for learners'),
+            onTap: () => open(ctx, () => _printTest(b)),
           ),
+          if (b.learners.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Answer sheets with names'),
+              subtitle: Text('${b.learners.length} sheets, names and learner numbers filled in. Fastest to scan.'),
+              onTap: () => open(ctx, () => _openSheets(b, [for (final l in b.learners) SheetTarget(l)])),
+            ),
           ListTile(
             leading: const Icon(Icons.note_outlined),
-            title: const Text('Blank sheets'),
-            subtitle: const Text('Learners write their name and shade their learner number.'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _openSheets(b, List.filled(b.learners.isEmpty ? 1 : b.learners.length, const SheetTarget(null)));
-            },
+            title: const Text('Blank answer sheets'),
+            subtitle: const Text('Learners write their name and shade their number.'),
+            onTap: () => open(ctx, () => _openSheets(b, List.filled(b.learners.isEmpty ? 1 : b.learners.length, const SheetTarget(null)))),
+          ),
+          ListTile(
+            leading: const Icon(Icons.key_outlined),
+            title: const Text('Answer key'),
+            subtitle: const Text('For your file'),
+            onTap: () => open(ctx, () => _printTest(b, key: true)),
           ),
           const SizedBox(height: 8),
         ]),
@@ -179,22 +191,22 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               ]),
             ),
             const SectionTitle('1 · Prepare'),
-            _step(Icons.edit_note, ready ? 'Edit items and answer key' : 'Add items and answer key', ready ? '${b.items.length} items' : 'Required before printing and checking',
+            _step(Icons.edit_note, ready ? 'Edit items and answer key' : 'Add items and answer key', ready ? '${b.items.length} items' : 'Type them, or enter just the answer key',
                 () => push(context, ExamEditorScreen(exam: b.exam)),
                 highlight: !ready),
-            _step(Icons.file_download_outlined, 'Import questions', 'From a photo, Word, PDF or pasted text', () => _import(b), color: teal),
-            _step(Icons.article_outlined, 'Print test paper', 'PDF of the questions for learners', () => _printTest(b)),
-            _step(Icons.grading_outlined, 'Print answer sheets', 'Bubble sheets that the camera can read', () => _printSheets(b)),
-            _step(Icons.key_outlined, 'Print answer key', 'For your file', () => _printTest(b, key: true)),
-            const SectionTitle('2 · Check'),
-            _step(Icons.document_scanner_outlined, 'Scan papers with the camera', b.unchecked.isEmpty ? 'All papers checked' : '${b.unchecked.length} left to check',
-                ready ? () => push(context, CameraScanScreen(examId: b.exam.id)) : () => toast(context, 'Add the answer key first.'),
-                highlight: ready && b.unchecked.isNotEmpty),
-            _step(Icons.touch_app_outlined, 'Check by tapping', 'Enter answers by hand, without the camera',
-                ready ? () => push(context, ManualCheckScreen(examId: b.exam.id)) : () => toast(context, 'Add the answer key first.')),
-            const SectionTitle('3 · Analyze'),
-            _step(Icons.insights_outlined, 'Results, MPS and item analysis', stats == null || stats.n == 0 ? 'Available after checking papers' : stats.masteryLevel,
-                () => push(context, ItemAnalysisScreen(examId: b.exam.id))),
+            if (!ready) _step(Icons.file_download_outlined, 'Import questions', 'From a photo, Word, PDF or pasted text', () => _import(b), color: teal),
+            if (ready) ...[
+              _step(Icons.print_outlined, 'Print', 'Test paper, answer sheets and answer key', () => _printMenu(b)),
+              const SectionTitle('2 · Check'),
+              _step(Icons.document_scanner_outlined, 'Scan papers with the camera', b.unchecked.isEmpty ? 'All papers checked' : '${b.unchecked.length} left to check',
+                  () => push(context, CameraScanScreen(examId: b.exam.id)),
+                  highlight: b.unchecked.isNotEmpty),
+              _step(Icons.touch_app_outlined, 'Check by tapping', 'Enter answers by hand, without the camera', () => push(context, ManualCheckScreen(examId: b.exam.id))),
+            ],
+            if (stats != null && stats.n > 0) ...[
+              const SectionTitle('3 · Results'),
+              _step(Icons.insights_outlined, 'Results, MPS and item analysis', stats.masteryLevel, () => push(context, ItemAnalysisScreen(examId: b.exam.id))),
+            ],
             if (b.responses.isNotEmpty) ...[
               const SectionTitle('Scores'),
               for (final l in b.learners)

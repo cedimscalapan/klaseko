@@ -1,12 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-import '../../core/export/share.dart';
 import '../../core/grading.dart';
 import '../../core/models.dart';
 import '../../core/sample.dart';
@@ -14,18 +11,11 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../brand.dart';
 import 'about_screen.dart';
+import 'backup.dart';
 import 'profile_form.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
-
-  Future<void> _backup(BuildContext context) async {
-    await withProgress(context, 'Making a backup...', () async {
-      final json = await store.repo.exportJson();
-      final stamp = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      await saveAndShare(Uint8List.fromList(utf8.encode(json)), 'KlaseKo backup $stamp.json', 'application/json');
-    });
-  }
 
   Future<void> _restore(BuildContext context) async {
     final ok = await confirm(context,
@@ -39,11 +29,18 @@ class MoreScreen extends StatelessWidget {
     final bytes = f.bytes ?? (f.path != null ? await File(f.path!).readAsBytes() : null);
     if (bytes == null) return;
     if (!context.mounted) return;
-    await withProgress(context, 'Restoring...', () async {
-      await store.repo.importJson(utf8.decode(bytes));
+    final restored = await withProgress<bool>(context, 'Restoring...', () async {
+      try {
+        await store.repo.importJson(utf8.decode(bytes));
+      } on TypeError {
+        throw const FormatException('This file is not a KlaseKo backup.');
+      } on FormatException {
+        throw const FormatException('This file is not a KlaseKo backup.');
+      }
       await store.reloadProfile();
+      return true;
     });
-    if (context.mounted) toast(context, 'Backup restored.');
+    if (restored == true && context.mounted) toast(context, 'Backup restored.', success: true);
   }
 
   @override
@@ -73,7 +70,10 @@ class MoreScreen extends StatelessWidget {
         const SectionTitle('Appearance'),
         _tile(context, Icons.contrast_rounded, 'Theme', _themeLabel(p.themeMode), () => _chooseTheme(context)),
         const SectionTitle('Your data'),
-        _tile(context, Icons.backup_outlined, 'Back up', 'Save all classes, scores and exams to one file. Keep it in Google Drive or a USB drive.', () => _backup(context)),
+        Loader<Map<String, String>>(
+          load: store.repo.settings,
+          builder: (context, settings) => _tile(context, Icons.backup_outlined, 'Back up', backupStatus(settings), () => backUpNow(context)),
+        ),
         _tile(context, Icons.restore_outlined, 'Restore', 'Bring back data from a KlaseKo backup file, for example on a new phone.', () => _restore(context)),
         _tile(context, Icons.science_outlined, 'Add a sample class', 'A fictional Grade 8 class to practice with.', () async {
           await withProgress(context, 'Adding sample class...', () => createSampleClass(store.repo, store.profile));
@@ -217,11 +217,11 @@ class PrintTipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _InfoScreen(title: 'Printing answer sheets', children: [
-        _p('Print at 100% size ("Actual size"), not "Fit to page". The black markers at the corners and edges must print clearly.'),
+        _p('Print at 100% size ("Actual size"), not "Fit to page", so the bubbles print at the right size.'),
         _p('Use the paper size set in your school profile (short, long or A4). Black ink only; grayscale is fine.'),
-        _p('Photocopies work if the markers stay dark and sharp. Avoid copies that are too light.'),
+        _p('Photocopies work if the circles and item numbers stay clear. Avoid copies that are too light.'),
         _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black markers.'),
-        _p('When scanning, lay the sheet flat on a plain table in good light, avoid shadows from your phone, and keep all four squares inside the frame.'),
+        _p('When scanning, lay the sheet flat in good light and avoid shadows from your phone. You do not need to line anything up: fit all the bubbles and their item numbers in the photo. Include the learner number too, and the app will know whose paper it is.'),
         _p('If a paper cannot be read, use "Check by tapping" for that learner.'),
       ]);
 }

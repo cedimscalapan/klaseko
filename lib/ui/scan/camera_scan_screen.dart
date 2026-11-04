@@ -11,6 +11,8 @@ import '../../core/db.dart';
 import '../../core/models.dart';
 import '../../core/omr/omr.dart';
 import '../exams/exam_detail_screen.dart';
+import '../exams/item_analysis_screen.dart';
+import 'manual_check_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'answer_grid.dart';
@@ -124,6 +126,12 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
     }
   }
 
+  Future<void> _enterByHand() async {
+    await push(context, ManualCheckScreen(examId: widget.examId));
+    _b = await loadExamBundle(widget.examId);
+    if (mounted) setState(() => _lastError = null);
+  }
+
   Future<void> _gallery() async {
     final file = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (file == null) return;
@@ -184,10 +192,16 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'No need to line anything up. Get all the bubbles and their item numbers in the photo, any angle, then tap the button.',
+                    _lastError ?? 'Fit all the bubbles and their item numbers in the photo. Any angle works.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),
+                if (_lastError != null)
+                  TextButton(
+                    onPressed: _enterByHand,
+                    style: TextButton.styleFrom(foregroundColor: Colors.white, minimumSize: const Size(48, 40)),
+                    child: const Text('Enter by hand', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
               ]),
             ),
           ),
@@ -213,7 +227,12 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
               Row(children: [
                 Text('$checked of $total checked', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 const Spacer(),
-                if (checked == total) const Text('All done', style: TextStyle(color: Color(0xFF7CDBA2), fontWeight: FontWeight.w700)),
+                if (checked == total)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ItemAnalysisScreen(examId: widget.examId))),
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF7CDBA2), minimumSize: const Size(48, 36)),
+                    child: const Text('All done · See results', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
               ]),
               const SizedBox(height: 8),
               SlimProgress(value: total == 0 ? 0 : checked / total, color: const Color(0xFF7CDBA2), height: 6),
@@ -355,8 +374,8 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
           child: Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(numRead == null ? 'Learner number not shaded' : 'Learner no. ${two(numRead)}', style: Theme.of(context).textTheme.titleMedium),
-                if (unmatched) Text('No learner has this number. Choose below.', style: TextStyle(color: penRed, fontSize: 13)),
+                Text(_lid == null ? 'Whose paper is this?' : b.learners.firstWhere((l) => l.id == _lid).fullName, style: Theme.of(context).textTheme.titleMedium),
+                if (unmatched) Text('No learner has number ${two(numRead ?? 0)}. Choose below.', style: TextStyle(color: penRed, fontSize: 13)),
                 const SizedBox(height: 4),
                 Row(children: [
                   Icon(_toCheck.isEmpty ? Icons.verified_rounded : Icons.error_outline_rounded, size: 18, color: _toCheck.isEmpty ? goodGreen : lateAmber),
@@ -377,7 +396,8 @@ class _ScanReviewScreenState extends State<ScanReviewScreen> {
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Whose paper is this?', prefixIcon: Icon(Icons.person_outline_rounded)),
           items: [
-            for (final l in b.learners)
+            // Learners still waiting come first: that is usually whose paper this is.
+            for (final l in [...b.unchecked, ...b.learners.where((l) => b.responses.containsKey(l.id))])
               DropdownMenuItem(
                 value: l.id,
                 child: Text('${two(l.num)}  ${l.fullName}${b.responses.containsKey(l.id) ? '  (checked)' : ''}', overflow: TextOverflow.ellipsis),

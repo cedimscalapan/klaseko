@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../core/db.dart';
@@ -5,6 +7,7 @@ import '../../core/export/share.dart';
 import '../../core/export/xlsx_docs.dart';
 import '../../core/grading.dart';
 import '../../core/models.dart';
+import '../exams/exam_detail_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'score_entry_screen.dart';
@@ -33,7 +36,9 @@ class ClassRecordScreen extends StatefulWidget {
 }
 
 class _ClassRecordScreenState extends State<ClassRecordScreen> {
-  int _term = 1; // 0 = final
+  int? _term; // null = the latest term with activities, 0 = final
+
+  int _shown(RecordData d) => _term ?? min(latestTerm(d.activities), store.profile.terms);
 
   Future<void> _export(RecordData d) async {
     await withProgress(context, 'Making the class record...', () async {
@@ -49,27 +54,20 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
       load: () => loadRecord(widget.cls),
       builder: (context, d) => Scaffold(
         appBar: AppBar(
-          title: const Text('Class record'),
+          title: ClassTitle('Class record', widget.cls),
           actions: [IconButton(tooltip: 'Export to Excel', icon: const Icon(Icons.ios_share), onPressed: () => _export(d))],
         ),
-        floatingActionButton: _term == 0
-            ? null
-            : FloatingActionButton.extended(
-                onPressed: () => showActivitySheet(context, widget.cls, term: _term),
-                icon: const Icon(Icons.add),
-                label: const Text('Add activity'),
-              ),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 96), children: [
+        body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 28), children: [
           SegmentedButton<int>(
             showSelectedIcon: false,
             segments: [
               for (var t = 1; t <= terms; t++) ButtonSegment(value: t, label: Text(store.profile.termLabel(t))),
               const ButtonSegment(value: 0, label: Text('Final')),
             ],
-            selected: {_term},
+            selected: {_shown(d)},
             onSelectionChanged: (s) => setState(() => _term = s.first),
           ),
-          if (_term == 0) ..._finalView(context, d) else ..._termView(context, d, _term),
+          if (_shown(d) == 0) ..._finalView(context, d) else ..._termView(context, d, _shown(d)),
         ]),
       ),
     );
@@ -101,7 +99,7 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
               child: AppCard(
                 padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
                 onTap: a.examId != null
-                    ? () => toast(context, 'Scores for this exam come from Check papers. Open the exam to change them.')
+                    ? () => push(context, ExamDetailScreen(examId: a.examId!))
                     : () => push(context, ScoreEntryScreen(cls: cls, activity: a)),
                 child: Row(children: [
                   Expanded(

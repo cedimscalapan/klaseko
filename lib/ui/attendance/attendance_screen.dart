@@ -68,11 +68,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _load();
   }
 
-  void _move(int days) {
+  /// The next school day in that direction.
+  DateTime _stepped(int days) {
     var d = _day.add(Duration(days: days));
     while (d.weekday > DateTime.friday) {
-      d = d.add(Duration(days: days.sign == 0 ? 1 : days.sign));
+      d = d.add(Duration(days: days));
     }
+    return d;
+  }
+
+  /// Attendance cannot be marked ahead of time.
+  bool get _canGoForward => dayKey(_stepped(1)).compareTo(dayKey(DateTime.now())) <= 0;
+
+  void _move(int days) {
+    final d = _stepped(days);
     setState(() {
       _day = d;
       _loading = true;
@@ -81,7 +90,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _pick() async {
-    final d = await showDatePicker(context: context, initialDate: _day, firstDate: DateTime(2020), lastDate: DateTime(2035));
+    final d = await showDatePicker(context: context, initialDate: _day, firstDate: DateTime(2020), lastDate: DateTime.now());
     if (d == null) return;
     setState(() {
       _day = d;
@@ -98,7 +107,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final unmarked = _learners.length - _marks.length;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Attendance'),
+        title: ClassTitle('Attendance', widget.cls),
         actions: [
           IconButton(
             tooltip: 'Monthly SF2',
@@ -123,13 +132,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(children: [
-                    Text(DateFormat('EEEE').format(_day), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    Text('${dayKey(_day) == dayKey(DateTime.now()) ? 'Today · ' : ''}${DateFormat('EEEE').format(_day)}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     Text(DateFormat('MMMM d, y').format(_day), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                   ]),
                 ),
               ),
             ),
-            IconButton(onPressed: () => _move(1), icon: const Icon(Icons.chevron_right)),
+            IconButton(onPressed: _canGoForward ? () => _move(1) : null, icon: const Icon(Icons.chevron_right)),
           ]),
         ),
         Padding(
@@ -140,10 +149,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             Pill('$l late', color: lateAmber),
             const SizedBox(width: 6),
             Pill('$a absent', color: penRed),
-            const Spacer(),
-            if (unmarked > 0) TextButton.icon(onPressed: _allPresent, icon: const Icon(Icons.done_all), label: Text('$unmarked left: all present')),
           ]),
         ),
+        if (!_loading && unmarked > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: _allPresent,
+                icon: const Icon(Icons.done_all),
+                label: Text(_marks.isEmpty ? 'Mark all $unmarked present' : 'Mark the other $unmarked present'),
+              ),
+            ),
+          ),
         const SizedBox(height: 6),
         Expanded(
           child: _loading

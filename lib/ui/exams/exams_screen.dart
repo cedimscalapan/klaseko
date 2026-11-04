@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../core/db.dart';
@@ -28,7 +30,7 @@ class ExamsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Exams and quizzes')),
+      appBar: AppBar(title: ClassTitle('Exams and quizzes', cls)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showNewExamSheet(context, cls),
         icon: const Icon(Icons.add),
@@ -81,9 +83,24 @@ class ExamsScreen extends StatelessWidget {
 Future<void> showNewExamSheet(BuildContext context, SchoolClass cls, {Exam? existing}) async {
   final title = TextEditingController(text: existing?.title ?? '');
   final instructions = TextEditingController(text: existing?.instructions ?? '');
-  var term = existing?.term ?? 1;
+  final acts = existing == null ? await store.repo.activities(cls.id) : const <Activity>[];
+  if (!context.mounted) return;
+  var term = existing?.term ?? min(latestTerm(acts), store.profile.terms);
   var comp = existing?.comp ?? 'ex';
   var sub = existing?.sub.isNotEmpty == true ? existing!.sub : 'te';
+  // The title follows the choices below until the teacher types their own.
+  var titleEdited = existing != null;
+  String suggestedTitle() {
+    final name = store.profile.termName(term);
+    if (comp == 'ww') return 'Quiz ${acts.where((a) => a.term == term && a.comp == 'ww').length + 1}';
+    return !cls.exSplit || sub == 'te' ? '$name Examination' : '$name ${exSubLabels[sub]}';
+  }
+
+  void retitle() {
+    if (!titleEdited) title.text = suggestedTitle();
+  }
+
+  retitle();
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -97,9 +114,9 @@ Future<void> showNewExamSheet(BuildContext context, SchoolClass cls, {Exam? exis
             const SizedBox(height: 14),
             TextField(
               controller: title,
-              autofocus: existing == null,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Term 1 Examination'),
+              onChanged: (_) => titleEdited = true,
             ),
             const SizedBox(height: 12),
             const Text('Term', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -108,7 +125,10 @@ Future<void> showNewExamSheet(BuildContext context, SchoolClass cls, {Exam? exis
               showSelectedIcon: false,
               segments: [for (var t = 1; t <= store.profile.terms; t++) ButtonSegment(value: t, label: Text(store.profile.termLabel(t)))],
               selected: {term},
-              onSelectionChanged: (s) => setSheet(() => term = s.first),
+              onSelectionChanged: (s) => setSheet(() {
+                term = s.first;
+                retitle();
+              }),
             ),
             const SizedBox(height: 12),
             const Text('Counts in the class record as', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -120,7 +140,10 @@ Future<void> showNewExamSheet(BuildContext context, SchoolClass cls, {Exam? exis
                 ButtonSegment(value: 'ex', label: Text('Examination')),
               ],
               selected: {comp},
-              onSelectionChanged: (s) => setSheet(() => comp = s.first),
+              onSelectionChanged: (s) => setSheet(() {
+                comp = s.first;
+                retitle();
+              }),
             ),
             if (comp == 'ex' && cls.exSplit) ...[
               const SizedBox(height: 10),
@@ -128,7 +151,10 @@ Future<void> showNewExamSheet(BuildContext context, SchoolClass cls, {Exam? exis
                 value: sub,
                 decoration: const InputDecoration(labelText: 'Examination part'),
                 items: [for (final e in exSubLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                onChanged: (v) => setSheet(() => sub = v!),
+                onChanged: (v) => setSheet(() {
+                  sub = v!;
+                  retitle();
+                }),
               ),
             ],
             const SizedBox(height: 12),

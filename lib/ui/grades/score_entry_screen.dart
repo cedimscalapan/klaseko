@@ -43,6 +43,15 @@ class _ScoreEntryScreenState extends State<ScoreEntryScreen> {
       _learners = learners;
       _loading = false;
     });
+    // Ready to type: the keyboard opens on the first learner without a score.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final l in learners) {
+        if (_ctrl[l.id]!.text.isEmpty) {
+          _focus[l.id]!.requestFocus();
+          break;
+        }
+      }
+    });
   }
 
   @override
@@ -93,9 +102,16 @@ class _ScoreEntryScreenState extends State<ScoreEntryScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(a.title),
-            Text('${compLabels[a.comp]} · HPS ${fmtScore(a.hps)}', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          title: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(a.title, overflow: TextOverflow.ellipsis),
+            ListenableBuilder(
+              listenable: Listenable.merge(_ctrl.values.toList()),
+              builder: (context, _) => Text(
+                '${widget.cls.title} · HPS ${fmtScore(a.hps)} · ${_ctrl.values.where((c) => c.text.trim().isNotEmpty).length}/${_learners.length} scored',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
           ]),
           actions: [
             TextButton(

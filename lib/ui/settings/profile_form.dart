@@ -4,8 +4,11 @@ import '../../core/models.dart';
 
 /// Fields for the school profile. Writes into [profile] when the parent Form is saved.
 class ProfileFields extends StatefulWidget {
-  const ProfileFields({super.key, required this.profile});
+  const ProfileFields({super.key, required this.profile, this.compact = false});
   final SchoolProfile profile;
+
+  /// Keeps everything except the name and school behind a "More school details" row.
+  final bool compact;
 
   @override
   State<ProfileFields> createState() => _ProfileFieldsState();
@@ -28,9 +31,7 @@ class _ProfileFieldsState extends State<ProfileFields> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _field('Your name (as it appears on forms)', p.teacher, (v) => p.teacher = v, required: true, hint: 'e.g. Maria L. Santos'),
-      _field('School name', p.schoolName, (v) => p.schoolName = v, required: true),
+    final details = <Widget>[
       _field('School ID', p.schoolId, (v) => p.schoolId = v, type: TextInputType.number),
       Row(children: [
         Expanded(child: _field('Region', p.region, (v) => p.region = v, hint: 'e.g. MIMAROPA')),
@@ -67,6 +68,21 @@ class _ProfileFieldsState extends State<ProfileFields> {
         selected: {p.paper},
         onSelectionChanged: (s) => setState(() => p.paper = s.first),
       ),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _field('Your name (as it appears on forms)', p.teacher, (v) => p.teacher = v, required: true, hint: 'e.g. Maria L. Santos'),
+      _field('School name', p.schoolName, (v) => p.schoolName = v, required: true),
+      if (widget.compact)
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          maintainState: true,
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          title: const Text('More school details', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('For form headers. You can add these later.'),
+          children: [const SizedBox(height: 4), ...details, const SizedBox(height: 8)],
+        )
+      else
+        ...details,
     ]);
   }
 }

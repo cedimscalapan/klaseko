@@ -318,6 +318,9 @@ class ExamItem {
 }
 
 /// Answer codes stored per item: 0..3 = A..D, -1 = blank, -2 = more than one shaded.
+/// The latest term that has activities, where the teacher is most likely working now.
+int latestTerm(Iterable<Activity> activities) => activities.fold(1, (t, a) => a.term > t ? a.term : t);
+
 const ansBlank = -1;
 const ansMulti = -2;
 

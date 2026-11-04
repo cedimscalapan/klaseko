@@ -31,7 +31,20 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee test.log
+      - name: Prepare the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KLASEKO_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/klaseko.jks"
+            echo "KLASEKO_KEYSTORE=$RUNNER_TEMP/klaseko.jks" >> "$GITHUB_ENV"
+            echo "Signing with the permanent key."
+          else
+            echo "::warning::No signing key is set, so this APK will not install over other builds. See docs/SELLING.md."
+          fi
       - name: Build APK
+        env:
+          KLASEKO_KEY_PASSWORD: ${{ secrets.KLASEKO_KEY_PASSWORD }}
         run: |
           set -o pipefail
           flutter build apk --release 2>&1 | tee build.log

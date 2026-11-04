@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/export/form_data.dart';
 import '../core/models.dart';
+import '../core/plan.dart';
 import 'attendance/attendance_screen.dart';
 import 'attention_screen.dart';
 import 'brand.dart';
@@ -11,6 +12,7 @@ import 'classes/class_form.dart';
 import 'classes/learners_screen.dart';
 import 'grades/class_record_screen.dart';
 import 'settings/backup.dart';
+import 'settings/plan_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -30,7 +32,10 @@ class _HomeData {
   final List<_ClassSummary> classes;
   final int attention;
   final String? backupReminder;
-  _HomeData(this.classes, this.attention, this.backupReminder);
+
+  /// Days left when Plus ends within a week.
+  final int? planEnding;
+  _HomeData(this.classes, this.attention, this.backupReminder, this.planEnding);
 }
 
 Color classColor(int i) => palette.classColors[i % palette.classColors.length];
@@ -57,7 +62,8 @@ class HomeScreen extends StatelessWidget {
       attention += rows.length;
       out.add(_ClassSummary(c, learners.length, att.length, att.values.where((s) => s != 'A').length, unchecked, rows.where((r) => r.grade != null).length));
     }
-    return _HomeData(out, attention, backupReminder(await repo.settings(), [for (final s in out) s.cls]));
+    final left = (await Plan.status()).daysLeft;
+    return _HomeData(out, attention, backupReminder(await repo.settings(), [for (final s in out) s.cls]), left != null && left <= 7 ? left : null);
   }
 
   @override
@@ -163,7 +169,15 @@ class HomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                   child: Column(children: [for (final t in tasks) _task(context, t)]),
                 ),
-                if (data.attention > 0 || data.backupReminder != null) const SizedBox(height: 10),
+                if (data.attention > 0 || data.backupReminder != null || data.planEnding != null) const SizedBox(height: 10),
+                if (data.planEnding != null)
+                  NavRow(
+                    icon: Icons.workspace_premium_rounded,
+                    title: data.planEnding == 0 ? 'KlaseKo Plus ends today' : 'KlaseKo Plus ends in ${data.planEnding} ${data.planEnding == 1 ? 'day' : 'days'}',
+                    subtitle: 'Your records stay either way. Extend it to keep unlimited scans.',
+                    color: lateAmber,
+                    onTap: () => push(context, const PlanScreen()),
+                  ),
                 if (data.attention > 0)
                   NavRow(
                     icon: Icons.volunteer_activism_rounded,

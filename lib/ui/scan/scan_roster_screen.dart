@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/plan.dart';
 import '../exams/exam_detail_screen.dart';
 import '../exams/item_analysis_screen.dart';
+import '../settings/plan_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'camera_scan_screen.dart';
@@ -77,6 +79,18 @@ class ScanRosterScreen extends StatelessWidget {
                       TextButton(
                         onPressed: () => push(context, CameraScanScreen(examId: examId)),
                         child: const Text('Scan in any order, using the learner number'),
+                      ),
+                      Loader<PlanStatus>(
+                        load: Plan.status,
+                        builder: (context, st) => st.plus
+                            ? const SizedBox()
+                            : InkWell(
+                                onTap: () => push(context, const PlanScreen()),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Text('Free plan: ${st.scansLeft} scans left this month', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: st.scansLeft <= 5 ? lateAmber : mutedText(context))),
+                                ),
+                              ),
                       ),
                     ]),
                   ),

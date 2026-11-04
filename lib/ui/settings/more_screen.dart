@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/grading.dart';
 import '../../core/models.dart';
+import '../../core/plan.dart';
 import '../../core/sample.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -13,6 +15,7 @@ import '../brand.dart';
 import 'about_screen.dart';
 import 'app_lock.dart';
 import 'backup.dart';
+import 'plan_screen.dart';
 import 'profile_form.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -67,6 +70,19 @@ class MoreScreen extends StatelessWidget {
             ),
             const Icon(Icons.edit_outlined),
           ]),
+        ),
+        const SizedBox(height: 10),
+        Loader<PlanStatus>(
+          load: Plan.status,
+          builder: (context, st) => _tile(
+            context,
+            st.plus ? Icons.workspace_premium_rounded : Icons.workspace_premium_outlined,
+            st.plus ? 'KlaseKo Plus' : 'Your plan: Free',
+            st.plus
+                ? (st.expires == null ? 'Unlimited classes and scans' : 'Until ${DateFormat('MMMM d, y').format(st.expires!)}')
+                : '${st.scansLeft} of $freeScansPerMonth scans left this month. Plus starts at ₱$priceMonth.',
+            () => push(context, const PlanScreen()),
+          ),
         ),
         const SectionTitle('Appearance'),
         _tile(context, Icons.contrast_rounded, 'Theme', _themeLabel(p.themeMode), () => _chooseTheme(context)),

@@ -11,10 +11,12 @@ import '../../core/db.dart';
 import '../../core/models.dart';
 import '../../core/omr/omr.dart';
 import '../../core/omr/sheet_layout.dart';
+import '../../core/plan.dart';
 import '../exams/exam_detail_screen.dart';
 import '../exams/item_analysis_screen.dart';
 import 'manual_check_screen.dart';
 import '../theme.dart';
+import '../settings/plan_screen.dart';
 import '../widgets.dart';
 import 'answer_grid.dart';
 
@@ -103,6 +105,13 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
   Future<void> _process(Uint8List bytes) async {
     final b = _b;
     if (b == null) return;
+    if (!(await Plan.status()).canScan) {
+      if (mounted) {
+        await push(context, const PlanScreen(reason: 'You have used this month\'s $freeScansPerMonth free scans. Get Plus for unlimited scans, or check papers by tapping, which is always free.'));
+      }
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _busy = true;
       _lastError = null;
@@ -146,6 +155,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
   Future<void> _afterSaved(String learnerId, int score) async {
     final name = _b!.learners.firstWhere((l) => l.id == learnerId).fullName;
     final message = '$name: $score/${_b!.items.length} recorded';
+    if (!_b!.responses.containsKey(learnerId)) await Plan.countScan();
     HapticFeedback.mediumImpact();
     _b = await loadExamBundle(widget.examId);
     if (!mounted) return;

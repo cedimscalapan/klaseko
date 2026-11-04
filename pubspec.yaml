@@ -13,6 +13,8 @@ dependencies:
   sqflite_sqlcipher: ^3.1.0+1
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.3
+  # Checks KlaseKo Plus activation codes offline
+  cryptography: ^2.7.0
   path_provider: ^2.1.4
   path: ^1.9.0
   # Printing and documents

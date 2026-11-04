@@ -26,6 +26,32 @@ void main() {
     stdout.writeln('Set minSdk 23 in $name');
   }
 
+  // Signs release builds with the permanent key when the build provides one (see docs/SELLING.md).
+  // Without it Flutter uses a temporary key, and an update cannot install over the old version.
+  final gradle = File('android/app/build.gradle.kts');
+  if (gradle.existsSync()) {
+    var s = gradle.readAsStringSync();
+    if (!s.contains('KLASEKO_KEYSTORE')) {
+      s = s.replaceFirst('    buildTypes {', '''    signingConfigs {
+        create("klaseko") {
+            val store = System.getenv("KLASEKO_KEYSTORE")
+            if (store != null) {
+                storeFile = file(store)
+                storePassword = System.getenv("KLASEKO_KEY_PASSWORD")
+                keyAlias = "klaseko"
+                keyPassword = System.getenv("KLASEKO_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {''');
+      s = s.replaceFirst('signingConfig = signingConfigs.getByName("debug")',
+          'signingConfig = signingConfigs.getByName(if (System.getenv("KLASEKO_KEYSTORE") != null) "klaseko" else "debug")');
+      gradle.writeAsStringSync(s);
+      stdout.writeln('Added release signing to build.gradle.kts');
+    }
+  }
+
   // Some plugins still compile against an older Android SDK than the AndroidX libraries they pull in,
   // which fails the release build's AAR metadata check. Compile every plugin against SDK 36.
   // The hook goes before `evaluationDependsOn(":app")` so it is registered before any project is evaluated.

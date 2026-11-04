@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/db.dart';
 import '../../core/grading.dart';
 import '../../core/models.dart';
+import '../../core/plan.dart';
+import '../settings/plan_screen.dart';
 import '../widgets.dart';
 import 'class_detail_screen.dart';
 
@@ -69,7 +71,16 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
   /// Teachers often have several sections of one subject, so a new class starts like the last one.
   Future<void> _startFromLastClass() async {
     final classes = await store.repo.classes();
-    if (classes.isEmpty || !mounted || _subject.text.isNotEmpty) return;
+    final plan = await Plan.status();
+    if (!mounted) return;
+    if (!plan.plus && classes.where((c) => !c.section.contains('(Sample)')).length >= freeClasses) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PlanScreen(reason: 'The free plan has $freeClasses classes. Get Plus to add more. Your classes stay as they are.')),
+      );
+      return;
+    }
+    if (classes.isEmpty || _subject.text.isNotEmpty) return;
     setState(() {
       _setGrade(classes.last.grade);
       _subject.text = classes.last.subject;

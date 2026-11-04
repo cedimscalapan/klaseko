@@ -1,3 +1,10 @@
+# Keys never belong in this project
+*.pem
+*.jks
+*.keystore
+keystore-*.txt
+sales.csv
+
 # Flutter / Dart
 .dart_tool/
 .packages

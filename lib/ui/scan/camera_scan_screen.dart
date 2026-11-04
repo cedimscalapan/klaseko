@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/db.dart';
 import '../../core/models.dart';
 import '../../core/omr/omr.dart';
+import '../../core/omr/sheet_layout.dart';
 import '../exams/exam_detail_screen.dart';
 import '../exams/item_analysis_screen.dart';
 import 'manual_check_screen.dart';
@@ -174,6 +175,15 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
               child: Text(_cameraError ?? 'Starting the camera...', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
             ),
           ),
+        if (b != null && cam != null && cam.value.isInitialized)
+          IgnorePointer(
+            child: CustomPaint(
+              painter: _ScanGuide(
+                (SheetLayout.areaRight(b.items.length) + SheetLayout.areaMarker) /
+                    (SheetLayout.areaBottom(b.items.length) - SheetLayout.areaTop + SheetLayout.areaMarker),
+              ),
+            ),
+          ),
         Positioned(
           left: 16,
           right: 16,
@@ -192,7 +202,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _lastError ?? 'Fit all the bubbles in the photo. Any angle works.',
+                    _lastError ?? 'Fit the answer box inside the corners. It does not have to be exact, and any angle works.',
                     style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
                   ),
                 ),
@@ -272,6 +282,34 @@ class _CameraScanScreenState extends State<CameraScanScreen> with WidgetsBinding
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
         ]),
       );
+}
+
+/// Corner brackets showing roughly where the answer box goes. They are only a guide: the scanner
+/// finds the sheet by itself, at any angle.
+class _ScanGuide extends CustomPainter {
+  const _ScanGuide(this.aspect);
+  final double aspect; // width / height
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final maxW = size.width * 0.9, maxH = size.height * 0.76;
+    final w = maxW / maxH > aspect ? maxH * aspect : maxW;
+    final h = w / aspect;
+    final r = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2 + size.height * 0.05), width: w, height: h);
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(220)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round;
+    const len = 30.0;
+    for (final (corner, dx, dy) in [(r.topLeft, 1.0, 1.0), (r.topRight, -1.0, 1.0), (r.bottomRight, -1.0, -1.0), (r.bottomLeft, 1.0, -1.0)]) {
+      canvas.drawLine(corner, corner + Offset(dx * len, 0), paint);
+      canvas.drawLine(corner, corner + Offset(0, dy * len), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScanGuide old) => old.aspect != aspect;
 }
 
 /// Shows what the scanner read. Items the reader is unsure about must be confirmed or corrected

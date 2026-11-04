@@ -19,6 +19,7 @@ Uint8List photo({
   int seed = 1,
   bool numbers = true,
   bool letters = false,
+  bool box = false,
 }) {
   const w = 1200, h = 1500;
   const pageW = 215.9, pageH = 279.4;
@@ -43,13 +44,15 @@ Uint8List photo({
       if (px >= 0 && py >= 0 && px <= pageW && py <= pageH) {
         v = 228;
         final fx = px - ox, fy = py - oy;
-        for (var id = 0; id < SheetLayout.markerCenters.length; id++) {
-          final c = SheetLayout.markerCenters[id];
-          final lx = fx - (c.x - SheetLayout.marker / 2), ly = fy - (c.y - SheetLayout.marker / 2);
-          if (lx < 0 || ly < 0 || lx >= SheetLayout.marker || ly >= SheetLayout.marker) continue;
-          final col = lx ~/ SheetLayout.markerCell, row = ly ~/ SheetLayout.markerCell;
+        final centers = box ? SheetLayout.areaMarkerCenters(answers.length) : SheetLayout.markerCenters;
+        final size = box ? SheetLayout.areaMarker : SheetLayout.marker;
+        for (var id = 0; id < centers.length; id++) {
+          final c = centers[id];
+          final lx = fx - (c.x - size / 2), ly = fy - (c.y - size / 2);
+          if (lx < 0 || ly < 0 || lx >= size || ly >= size) continue;
+          final col = lx ~/ (size / 6), row = ly ~/ (size / 6);
           final border = row == 0 || col == 0 || row == 5 || col == 5;
-          if (border || SheetLayout.markerBit(id, row - 1, col - 1)) v = 25;
+          if (border || SheetLayout.markerBit(box ? SheetLayout.areaCodeStart + id : id, row - 1, col - 1)) v = 25;
         }
         void bubble(double cx, double cy, double r, String key) {
           final d = sqrt((fx - cx) * (fx - cx) + (fy - cy) * (fy - cy));
@@ -76,7 +79,14 @@ Uint8List photo({
             }
           }
         }
-        if (fx > SheetLayout.idX0 - 4) {
+        if (box) {
+          for (var col = 0; col < 2; col++) {
+            for (var d = 0; d < 10; d++) {
+              final b = SheetLayout.areaIdBubble(col, d);
+              if ((b.x - fx).abs() < 4 && (b.y - fy).abs() < 4) bubble(b.x, b.y, SheetLayout.idR, 'd$col:$d');
+            }
+          }
+        } else if (fx > SheetLayout.idX0 - 4) {
           for (var col = 0; col < 2; col++) {
             for (var d = 0; d < 10; d++) {
               final b = SheetLayout.idBubble(col, d);
@@ -173,6 +183,43 @@ void main() {
   test('refuses a close-up that leaves out some items', () {
     final r = readAnswerSheet(OmrRequest(closeUp(answers.sublist(0, 16)), 16));
     expect(r.ok, isFalse);
+  });
+
+  // The answer box: the photo is centred on sheet point (cx, cy) mm.
+  Uint8List boxPhoto(List<int> a, int learner, double cx, double cy, {double rotDeg = 0, double pxPerMm = 12}) {
+    final r = rotDeg * pi / 180, ca = cos(r), sa = sin(r);
+    final px = cx - 90, py = cy - 125; // from the page centre, which is the sheet frame's centre
+    final u = (px * ca - py * sa) * pxPerMm, v = (px * sa + py * ca) * pxPerMm;
+    return photo(answers: a, learnerNum: learner, pxPerMm: pxPerMm, dx: -u, dy: -v, rotDeg: rotDeg, box: true);
+  }
+
+  void expectBox(OmrResult r, int? learner) {
+    expect(r.ok, isTrue, reason: r.error);
+    expect(r.learnerNum, learner);
+    for (var i = 0; i < ten.length; i++) {
+      if (!r.review.contains(i)) expect(r.answers[i], ten[i], reason: 'item ${i + 1}');
+    }
+    expect(r.review.length, lessThan(2));
+  }
+
+  test('reads only the answer box', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 44, 117.6), 10)), 27);
+  });
+
+  test('reads a tilted answer box', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 8, 44, 117.6, rotDeg: 9, pxPerMm: 10.5), 10)), 8);
+  });
+
+  test('reads an upside-down answer box', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 53, 44, 117.6, rotDeg: 177), 10)), 53);
+  });
+
+  test('reads the answer box with its right side cut off', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 28, 117.6), 10)), null);
+  });
+
+  test('reads the answer box with no markers in the photo, learner number included', () {
+    expectBox(readAnswerSheet(OmrRequest(boxPhoto(ten, 27, 44, 116, pxPerMm: 15), 10)), 27);
   });
 
   test('reads the answers when only the learner number is outside the photo', () {

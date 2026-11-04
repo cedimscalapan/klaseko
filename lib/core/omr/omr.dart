@@ -93,7 +93,7 @@ OmrResult readAnswerSheet(OmrRequest req) {
     final img2 = _Img(g, w, h);
     final n = min(req.items, SheetLayout.maxItems);
     final lab = _label(g, w, h, thr);
-    final sheet = _findSheet(lab, g, w, h, thr);
+    final sheet = _findSheet(lab, g, w, h, thr, n);
     var found = sheet.hom;
     if (found == null) {
       // No usable markers: a close-up of the answers. Place the sheet from the bubbles themselves.
@@ -112,7 +112,9 @@ OmrResult readAnswerSheet(OmrRequest req) {
       if (!inside(SheetLayout.itemBubble(i, 0)) || !inside(SheetLayout.itemBubble(i, SheetLayout.choices - 1))) return OmrResult.fail(_outsidePhoto);
     }
     // The learner number is read when it is in the photo; otherwise the teacher picks the learner.
-    final idInView = [0, 1].every((col) => inside(SheetLayout.idBubble(col, 0)) && inside(SheetLayout.idBubble(col, 9)));
+    // Only version 3 markers mean the number is at the top right; otherwise it is in the answer box.
+    Pt idAt(int col, int d) => sheet.hom != null && !sheet.answerBox ? SheetLayout.idBubble(col, d) : SheetLayout.areaIdBubble(col, d);
+    final idInView = [0, 1].every((col) => inside(idAt(col, 0)) && inside(idAt(col, 9)));
     final rows = <List<double>>[];
     final ringScores = <double>[];
     final offsets = <double>[];
@@ -143,7 +145,7 @@ OmrResult readAnswerSheet(OmrRequest req) {
 
     // Learner number: each digit column is registered and read like an item with 10 choices.
     int? digit(int col) {
-      final centers = [for (var d = 0; d < 10; d++) SheetLayout.idBubble(col, d)];
+      final centers = [for (var d = 0; d < 10; d++) idAt(col, d)];
       final reg = _register(img2, hom, centers, SheetLayout.idR);
       final f = [for (final c in centers) _darknessAt(img2, hom, c.x + reg.dx, c.y + reg.dy, SheetLayout.idR)];
       final sorted = [...f]..sort((a, b) => b.compareTo(a));
@@ -453,10 +455,13 @@ class _Sheet {
   final bool estimated;
   final int markers;
   final bool inconsistent;
-  _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false});
+
+  /// The markers found are the answer box markers of a version 4 sheet.
+  final bool answerBox;
+  _Sheet(this.hom, this.estimated, this.markers, {this.inconsistent = false, this.answerBox = false});
 }
 
-_Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr) {
+_Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr, int items) {
   final area = w * h;
   final found = <int, _Marker>{};
   for (final b in lab.blobs) {
@@ -470,12 +475,16 @@ _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr) {
     final m = _decodeMarker(g, w, h, thr, quad);
     if (m != null && (found[m.id] == null || m.dist < found[m.id]!.dist)) found[m.id] = m;
   }
+  final boxMarkers = found.keys.where((id) => id >= SheetLayout.areaCodeStart).length;
+  final answerBox = boxMarkers * 2 >= found.length && boxMarkers > 0;
+  found.removeWhere((id, _) => (id >= SheetLayout.areaCodeStart) != answerBox);
   if (found.length < 2) return _Sheet(null, false, found.length);
 
-  const half = SheetLayout.marker / 2;
+  final half = (answerBox ? SheetLayout.areaMarker : SheetLayout.marker) / 2;
+  final centers = answerBox ? SheetLayout.areaMarkerCenters(items) : SheetLayout.markerCenters;
   final src = <Pt>[], dst = <Pt>[];
   found.forEach((id, m) {
-    final c = SheetLayout.markerCenters[id];
+    final c = centers[answerBox ? id - SheetLayout.areaCodeStart : id];
     src.addAll([Pt(c.x - half, c.y - half), Pt(c.x + half, c.y - half), Pt(c.x + half, c.y + half), Pt(c.x - half, c.y + half)]);
     dst.addAll(m.corners);
   });
@@ -489,7 +498,7 @@ _Sheet _findSheet(_Labeled lab, Uint8List g, int w, int h, int thr) {
     final err = sqrt(pow(p.x - dst[i].x, 2) + pow(p.y - dst[i].y, 2)) / pxPerMm;
     if (err > 1.5) return _Sheet(null, false, found.length, inconsistent: true);
   }
-  return _Sheet(hom, found.length < 3, found.length);
+  return _Sheet(hom, found.length < 3, found.length, answerBox: answerBox);
 }
 
 // ---------------------------------------------------------------------------
@@ -623,7 +632,16 @@ _GridFit _findGrid(_Labeled lab, _Img im, int w, int h, int thr, int n) {
     }
     comps.add(comp);
   }
-  final comp = comps.reduce((a, b) => a.length >= b.length ? a : b);
+  // The item grid is exactly four choices across. Other round marks, like learner number bubbles,
+  // form groups of their own.
+  int span(List<int> group, int Function((int, int)) axis) {
+    final v = [for (final i in group) axis(coord[i]!)];
+    return v.reduce(max) - v.reduce(min) + 1;
+  }
+
+  final itemGroups = comps.where((c) => span(c, (p) => p.$1) == SheetLayout.choices || span(c, (p) => p.$2) == SheetLayout.choices);
+  if (itemGroups.isEmpty) return _GridFit(null);
+  final comp = itemGroups.reduce((a, b) => a.length >= b.length ? a : b);
   if (comp.length < 8) return _GridFit(null);
   final ks = [for (final i in comp) coord[i]!.$1], rs = [for (final i in comp) coord[i]!.$2];
   final kmin = ks.reduce(min), kmax = ks.reduce(max), rmin = rs.reduce(min), rmax = rs.reduce(max);

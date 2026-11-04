@@ -72,8 +72,11 @@ Future<Uint8List> buildAnswerSheets({
   final n = itemCount.clamp(1, SheetLayout.maxItems);
 
   pw.Widget at(double x, double y, pw.Widget child) => pw.Positioned(left: (ox + x) * mm, top: (oy + y) * mm, child: child);
+  // The answer box is centered on the page; everything in it is placed from its left edge.
+  final boxX = (SheetLayout.frameW - SheetLayout.areaRight(n)) / 2;
+  pw.Widget atBox(double x, double y, pw.Widget child) => at(boxX + x, y, child);
 
-  pw.Widget bubble(double cx, double cy, double r, String label, {bool filled = false}) => at(
+  pw.Widget bubble(double cx, double cy, double r, String label, {bool filled = false}) => atBox(
         cx - r,
         cy - r,
         pw.Container(
@@ -92,28 +95,50 @@ Future<Uint8List> buildAnswerSheets({
   for (final target in targets) {
     final l = target.learner;
     final children = <pw.Widget>[];
-    // Coded markers: black border plus a 4 x 4 pattern that names each marker.
-    const cell = SheetLayout.markerCell;
-    for (var id = 0; id < SheetLayout.markerCenters.length; id++) {
-      final c = SheetLayout.markerCenters[id];
-      final x0 = c.x - SheetLayout.marker / 2, y0 = c.y - SheetLayout.marker / 2;
-      children.add(at(x0, y0, pw.Container(width: SheetLayout.marker * mm, height: SheetLayout.marker * mm, color: PdfColors.white)));
+    // The answer box: coded markers (a black border plus a 4 x 4 pattern that names each marker)
+    // joined by thin lines that stop short of them, so a line never touches a marker.
+    const cell = SheetLayout.areaMarkerCell;
+    const half = SheetLayout.areaMarker / 2;
+    final box = SheetLayout.areaMarkerCenters(n);
+    for (var id = 0; id < box.length; id++) {
+      final c = box[id];
+      final x0 = c.x - half, y0 = c.y - half;
+      children.add(atBox(x0, y0, pw.Container(width: SheetLayout.areaMarker * mm, height: SheetLayout.areaMarker * mm, color: PdfColors.white)));
       for (var r = 0; r < 6; r++) {
         for (var col = 0; col < 6; col++) {
           final border = r == 0 || col == 0 || r == 5 || col == 5;
-          if (!border && !SheetLayout.markerBit(id, r - 1, col - 1)) continue;
+          if (!border && !SheetLayout.markerBit(SheetLayout.areaCodeStart + id, r - 1, col - 1)) continue;
           // Slight overlap so neighbouring black cells print as one solid area.
-          children.add(at(x0 + col * cell, y0 + r * cell, pw.Container(width: (cell + 0.05) * mm, height: (cell + 0.05) * mm, color: PdfColors.black)));
+          children.add(atBox(x0 + col * cell, y0 + r * cell, pw.Container(width: (cell + 0.05) * mm, height: (cell + 0.05) * mm, color: PdfColors.black)));
         }
       }
     }
+    const gap = half + 2.5;
+    void edge(Pt a, Pt b) {
+      final across = a.y == b.y;
+      children.add(atBox(
+        across ? a.x + gap : a.x - 0.1,
+        across ? a.y - 0.1 : a.y + gap,
+        pw.Container(width: (across ? b.x - a.x - 2 * gap : 0.2) * mm, height: (across ? 0.2 : b.y - a.y - 2 * gap) * mm, color: PdfColors.grey500),
+      ));
+    }
+
+    edge(box[0], box[6]);
+    edge(box[6], box[1]);
+    edge(box[3], box[7]);
+    edge(box[7], box[2]);
+    edge(box[0], box[4]);
+    edge(box[4], box[3]);
+    edge(box[1], box[5]);
+    edge(box[5], box[2]);
+    children.add(atBox(0, SheetLayout.areaTop - 8.6, _t('ANSWER BOX: shade inside. The teacher scans only this box.', size: 6.5, color: PdfColors.grey700)));
 
     // Header
     children.add(at(
       6,
       6,
       pw.SizedBox(
-        width: 128 * mm,
+        width: 168 * mm,
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           _t('KlaseKo Answer Sheet', size: 12, bold: true),
           pw.SizedBox(height: 2),
@@ -135,31 +160,28 @@ Future<Uint8List> buildAnswerSheets({
             pw.Expanded(child: _line('Score', '')),
           ]),
           pw.SizedBox(height: 6),
-          _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold or write on the black markers.', size: 6.5, color: PdfColors.grey700),
+          _t('Shade one circle fully for each item using a dark pen or pencil. Do not fold the sheet or write on the black squares.', size: 6.5, color: PdfColors.grey700),
         ]),
       ),
     ));
 
-    // Learner number block
-    children.add(at(SheetLayout.idX0 - 7, 6, _t('LEARNER NO.', size: 6.5, bold: true)));
+    // Learner number, inside the answer box
+    children.add(atBox(6, 66.3, _t('LEARNER NO.', size: 6.5, bold: true)));
     final tens = l == null ? -1 : (l.num ~/ 10) % 10;
     final ones = l == null ? -1 : l.num % 10;
     for (var col = 0; col < 2; col++) {
+      children.add(atBox(6, SheetLayout.areaIdBubble(col, 0).y - 1.3, _t(col == 0 ? 'Tens' : 'Ones', size: 7, color: PdfColors.grey700)));
       for (var d = 0; d < 10; d++) {
-        final c = SheetLayout.idBubble(col, d);
+        final c = SheetLayout.areaIdBubble(col, d);
         final filled = (col == 0 && d == tens) || (col == 1 && d == ones);
         children.add(bubble(c.x, c.y, SheetLayout.idR, '$d', filled: filled));
       }
-    }
-    for (var d = 0; d < 10; d++) {
-      final c = SheetLayout.idBubble(0, d);
-      children.add(at(c.x - 8, c.y - 1.6, _t('$d', size: 6, color: PdfColors.grey600)));
     }
 
     // Item bubbles
     for (var i = 0; i < n; i++) {
       final lab = SheetLayout.itemLabel(i);
-      children.add(at(lab.x - 4, lab.y - 1.7, pw.SizedBox(width: 6 * mm, child: _t('${i + 1}', size: 7.5, bold: true, align: pw.TextAlign.right))));
+      children.add(atBox(lab.x - 4, lab.y - 1.7, pw.SizedBox(width: 6 * mm, child: _t('${i + 1}', size: 7.5, bold: true, align: pw.TextAlign.right))));
       for (var c = 0; c < SheetLayout.choices; c++) {
         final b = SheetLayout.itemBubble(i, c);
         children.add(bubble(b.x, b.y, SheetLayout.bubbleR, 'ABCD'[c]));

@@ -217,11 +217,11 @@ class PrintTipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _InfoScreen(title: 'Printing answer sheets', children: [
-        _p('Print at 100% size ("Actual size"), not "Fit to page", so the bubbles print at the right size.'),
+        _p('Print at 100% size ("Actual size"), not "Fit to page", so the answer box prints at the right size.'),
         _p('Use the paper size set in your school profile (short, long or A4). Black ink only; grayscale is fine.'),
         _p('Photocopies work if the circles and item numbers stay clear. Avoid copies that are too light.'),
-        _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black markers.'),
-        _p('When scanning, lay the sheet flat in good light and avoid shadows from your phone. You do not need to line anything up: just fit all the bubbles in the photo. Include the learner number too, and the app will know whose paper it is.'),
+        _p('Ask learners to shade one circle fully with a dark pen or a soft pencil, and not to write on the black squares.'),
+        _p('When scanning, lay the sheet flat in good light and avoid shadows from your phone. Scan only the answer box, the part with the black squares around the bubbles and the learner number. It does not have to line up exactly. Sheets printed before this update still scan.'),
         _p('If a paper cannot be read, use "Check by tapping" for that learner.'),
       ]);
 }

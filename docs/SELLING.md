@@ -31,6 +31,24 @@ Every code is recorded in `sales.csv` in the `.klaseko` folder of your home fold
 
 A code works only on the phone it was made for. A teacher who changes phones, or reinstalls the app, gets a new phone ID and needs a new code from you. Check `sales.csv` for when their plan ends, and give them a code that covers the time they have left.
 
+## Ready-to-sell codes
+
+These work on any phone, with no phone ID needed. Make a batch on your computer:
+
+```bash
+node tool/make_batch.js year 50
+```
+
+```bash
+node tool/make_batch.js month 50
+```
+
+The codes go in `batch-codes.csv` in the `.klaseko` folder. Send a teacher the next unused code and write their name in the `sold_to` column, or a code may get sold twice.
+
+- A plan's days start when the teacher enters the code. Entering a code early adds to the days left.
+- A code must be entered within one year of being made.
+- **A code can be shared.** Nothing stops one code from working on many phones, and a code cannot be cancelled once it is out. One code also works again on the same phone after the app is reinstalled. Use one-phone codes for anyone you do not know. The online system would close this gap by allowing each code to be used once.
+
 ## Your keys
 
 The `.klaseko` folder in your home folder holds what the business depends on. **Copy it somewhere safe, such as a private USB drive, and never send it to anyone or put it in the project.**
@@ -39,6 +57,7 @@ The `.klaseko` folder in your home folder holds what the business depends on. **
 | --- | --- | --- |
 | `activation-key.pem` | Makes activation codes | You cannot make codes until a new app version ships with a new key |
 | `klaseko-release.jks`, `keystore-password.txt` | Signs the app, so updates install over the old version | Teachers must uninstall and reinstall to update, which erases their data unless they restored a backup |
+| `batch-codes.csv` | Lists your ready-to-sell codes | Unsold codes still work, but you cannot see them |
 | `keystore-base64.txt` | The signing key in the form GitHub needs | Can be made again from the `.jks` file |
 
 Anyone with `activation-key.pem` can make free codes. Anyone with the signing key could publish an update that looks like yours.

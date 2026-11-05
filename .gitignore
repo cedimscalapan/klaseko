@@ -4,6 +4,7 @@
 *.keystore
 keystore-*.txt
 sales.csv
+batch-codes.csv
 
 # Flutter / Dart
 .dart_tool/

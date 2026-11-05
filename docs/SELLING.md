@@ -11,29 +11,12 @@ A plan ending never locks anyone out. Teachers can still open, edit and print al
 
 ## Making a sale
 
-1. The teacher pays your GCash and sends the receipt and their phone ID, from **More → Your plan**.
+1. The teacher pays your GCash and sends you the receipt, using **Write the message** in **More → Your plan**.
 2. Check that the payment arrived.
-3. On your computer, in the project folder, run:
+3. Send the teacher the next unused code of that plan from `batch-codes.csv`, in the `.klaseko` folder of your home folder. Write their name in the `sold_to` column, or a code may get sold twice.
+4. They paste it in **Your plan** and tap **Turn on Plus**. It works offline, and no phone ID is needed.
 
-   ```bash
-   node tool/make_code.js AB23-CD45 year "Maria Santos"
-   ```
-
-   Use `month` for a one-month plan. For an early renewal, add the date the current plan ends, so the teacher keeps those days:
-
-   ```bash
-   node tool/make_code.js AB23-CD45 month "Maria Santos" 2027-01-15
-   ```
-
-4. Send the teacher the code starting with `KK-`. They paste it in **Your plan** and tap **Turn on Plus**. It works offline.
-
-Every code is recorded in `sales.csv` in the `.klaseko` folder of your home folder.
-
-A code works only on the phone it was made for. A teacher who changes phones, or reinstalls the app, gets a new phone ID and needs a new code from you. Check `sales.csv` for when their plan ends, and give them a code that covers the time they have left.
-
-## Ready-to-sell codes
-
-These work on any phone, with no phone ID needed. Make a batch on your computer:
+When you run low, make more on your computer, in the project folder:
 
 ```bash
 node tool/make_batch.js year 50
@@ -43,11 +26,25 @@ node tool/make_batch.js year 50
 node tool/make_batch.js month 50
 ```
 
-The codes go in `batch-codes.csv` in the `.klaseko` folder. Send a teacher the next unused code and write their name in the `sold_to` column, or a code may get sold twice.
-
 - A plan's days start when the teacher enters the code. Entering a code early adds to the days left.
 - A code must be entered within one year of being made.
-- **A code can be shared.** Nothing stops one code from working on many phones, and a code cannot be cancelled once it is out. One code also works again on the same phone after the app is reinstalled. Use one-phone codes for anyone you do not know. The online system would close this gap by allowing each code to be used once.
+- **A code can be shared.** Nothing stops one code from working on many phones, and a code cannot be cancelled once it is out. One code also works again on the same phone after the app is reinstalled. For anyone you do not know, use a one-phone code. The online system would close this gap by allowing each code to be used once.
+
+## One-phone codes
+
+These work only on one phone, so sharing them does nothing. Ask the teacher for the phone ID shown in small print at the bottom of **Your plan**, then run:
+
+```bash
+node tool/make_code.js AB23-CD45 year "Maria Santos"
+```
+
+Use `month` for a one-month plan. For an early renewal, add the date the current plan ends, so the teacher keeps those days:
+
+```bash
+node tool/make_code.js AB23-CD45 month "Maria Santos" 2027-01-15
+```
+
+These codes are recorded in `sales.csv` in the `.klaseko` folder. A teacher who changes phones, or reinstalls the app, gets a new phone ID and needs a new code from you. Check `sales.csv` for when their plan ends, and give them a code that covers the time they have left.
 
 ## Your keys
 

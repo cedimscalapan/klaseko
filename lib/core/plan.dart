@@ -77,7 +77,7 @@ Future<PlanCode?> readPlanCode(String text, {String publicKey = _publicKey}) asy
 /// Why a genuine code cannot be used on this phone, or null when it can.
 String? planCodeProblem(PlanCode code, String phoneId, DateTime now) {
   if (code.anyPhone) return code.expires.isBefore(now) ? 'This code is too old to use. Ask for a new one.' : null;
-  if (code.phoneId != phoneId) return 'This code was made for a different phone. Send your phone ID to get the right one.';
+  if (code.phoneId != phoneId) return 'This code was made for a different phone. Ask for a new code.';
   if (code.expires.isBefore(now)) return 'This code has already ended.';
   return null;
 }

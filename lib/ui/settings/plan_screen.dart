@@ -7,7 +7,7 @@ import '../../core/plan.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// Shows the current plan and how to get KlaseKo Plus: pay by GCash, send the phone ID, paste the code.
+/// Shows the current plan and how to get KlaseKo Plus: pay by GCash, send the receipt, paste the code.
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key, this.reason});
 
@@ -47,8 +47,7 @@ class _PlanScreenState extends State<PlanScreen> {
     toast(context, 'KlaseKo Plus is on. Salamat po!', success: true);
   }
 
-  String _request(PlanStatus st) =>
-      'Hello! I would like KlaseKo Plus for ${_yearly ? 'one year (P$priceYear)' : 'one month (P$priceMonth)'}. My phone ID is ${formatPhoneId(st.phoneId)}. My GCash receipt is attached.';
+  String _request() => 'Hello! I would like KlaseKo Plus for ${_yearly ? 'one year (P$priceYear)' : 'one month (P$priceMonth)'}. My GCash receipt is attached.';
 
   Widget _compare(String label, String free, String plus) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
@@ -136,22 +135,10 @@ class _PlanScreenState extends State<PlanScreen> {
           ),
           _step(
             2,
-            'Send your phone ID and receipt',
+            'Send your GCash receipt',
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                Expanded(child: SelectableText(formatPhoneId(st.phoneId), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 1.5))),
-                IconButton(
-                  tooltip: 'Copy phone ID',
-                  icon: const Icon(Icons.copy_rounded),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: formatPhoneId(st.phoneId)));
-                    toast(context, 'Phone ID copied.');
-                  },
-                ),
-              ]),
-              if (payContact.isNotEmpty) Text('Send it to $payContact.'),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(onPressed: () => Share.share(_request(st)), icon: const Icon(Icons.send_rounded), label: const Text('Write the message')),
+              if (payContact.isNotEmpty) ...[Text('Send it to $payContact.'), const SizedBox(height: 8)],
+              OutlinedButton.icon(onPressed: () => Share.share(_request()), icon: const Icon(Icons.send_rounded), label: const Text('Write the message')),
             ]),
           ),
           _step(
@@ -175,6 +162,10 @@ class _PlanScreenState extends State<PlanScreen> {
               const SizedBox(height: 10),
               FilledButton(onPressed: _activate, child: const Text('Turn on Plus')),
             ]),
+          ),
+          // Only needed if the seller makes a code for this one phone.
+          Center(
+            child: SelectableText('Phone ID ${formatPhoneId(st.phoneId)}', style: TextStyle(fontSize: 11.5, color: mutedText(context))),
           ),
         ]),
       ),

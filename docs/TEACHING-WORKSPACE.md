@@ -6,7 +6,7 @@ Institution profiles use percentage computation without DepEd transmutation. Hig
 
 Add syllabus outcomes or competencies with a unique code, description, reference and target. Add assessments with those codes; rubric criterion maxima must total the assessment's maximum score. Tap an assessment to enter scores. Rubric scoring supports applying the same evaluation to specified group members by learner number. Existing exams and manually entered activities appear in the same list.
 
-Outcome progress measures assessed points only; no evidence displays as such. This is a classroom support view, not an automatic accreditation attainment determination. Tap a learner to record support or consultation plans and review or resolve them later.
+Outcome progress measures assessed points only; no evidence displays as such. Outcome summaries are classroom evidence, not an automatic accreditation attainment determination. Intervention and consultation workflows are outside this app.
 
 Configure report columns and export CSV grade sheets. Reusable layouts are KlaseKo JSON files containing title and column configuration, without learner records. Import and share those layouts between teachers. Arbitrary Excel or Word layouts are not supported by this new CSV exporter; the existing school-form template feature remains separate. Missing scores produce Incomplete in institution exports.
 

@@ -260,13 +260,15 @@ Future<FormValues> buildFormValues(
                       : _num(r.comps[comp]!.ps! * engine.weightOf(comp) / 100),
                 },
                 'initial': r.hasData ? r.initialGrade.toStringAsFixed(2) : '',
-                'term_grade': r.display,
+                'term_grade': r.incomplete ? '' : r.display,
               },
               {
                 for (final comp in const ['ww', 'pt', 'ex'])
                   '${comp}_scores': [
                     for (final a in inComp[comp]!)
-                      _num(engine.scores[a.id]?[l.id])
+                      a.workStates[l.id] == 'excused'
+                          ? 'EXC'
+                          : _num(engine.scores[a.id]?[l.id])
                   ],
               },
             );
@@ -284,11 +286,14 @@ Future<FormValues> buildFormValues(
           return LearnerValues(l.sex, {
             ..._learner(l, p.sy),
             for (var t = 1; t <= f.terms.length; t++)
-              'term_$t': f.terms[t - 1].display,
-            'final': f.letter ?? f.finalGrade?.toString() ?? '',
-            'descriptor': f.finalGrade == null || c.transmute == 'raw'
-                ? ''
-                : descriptor(f.finalGrade!, legacy: c.legacyRules),
+              'term_$t':
+                  f.terms[t - 1].incomplete ? '' : f.terms[t - 1].display,
+            'final':
+                f.partial ? '' : f.letter ?? f.finalGrade?.toString() ?? '',
+            'descriptor':
+                f.partial || f.finalGrade == null || c.transmute == 'raw'
+                    ? ''
+                    : descriptor(f.finalGrade!, legacy: c.legacyRules),
             'remarks': f.remarks,
           });
         }(),

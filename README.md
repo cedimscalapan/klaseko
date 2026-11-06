@@ -1,6 +1,6 @@
 # KlaseKo
 
-Offline class records, exam maker and paper checker for DepEd teachers. Flutter app for Android (iOS ready).
+Offline teacher companion with class records, exams and paper checking for DepEd, private K–12 and higher education teachers. Flutter app for Android (iOS ready).
 
 *Isang entry, tapos na ang forms.*
 
@@ -8,6 +8,7 @@ Offline class records, exam maker and paper checker for DepEd teachers. Flutter 
 
 | Area | Features |
 | --- | --- |
+| Daily companion | One suggested next step on Today, optional routines and reminders, missing-work tracker, quick class notes |
 | Classes | One class per section and subject; advisory flag turns on SF1, SF2, SF9 |
 | Learners | Add, edit, paste a class list from SF1/LIS/Excel, statuses (T/I, T/O, dropped), stable learner numbers |
 | Attendance | Present / Late / Absent in one tap, mark all present, clear holidays, monthly SF2 |
@@ -99,7 +100,7 @@ Tested with a JavaScript copy of the reader on simulated photos: on 17 hard case
 
 ## School profiles and teaching workspace
 
-Choose DepEd, Private K–12 or Higher Education when creating a class. Open **Teaching workspace** from the class page to configure and confirm school grading policies, reuse a policy across classes, add assessment types and rubrics, map syllabus outcomes, track learner support, and configure or import reusable CSV grade sheet layouts. See [Teaching workspace](docs/TEACHING-WORKSPACE.md) for supported formats and policy setup.
+Choose DepEd, Private K–12 or Higher Education when creating a class. Open **Teaching workspace** from the class page to configure and confirm school grading policies, reuse a policy across classes, add assessment types and rubrics, map syllabus outcomes, and configure or import reusable CSV grade sheet layouts. See [Teaching workspace](docs/TEACHING-WORKSPACE.md) for supported formats and policy setup.
 
 Higher education grading uses institution-defined policies, without a universal CHED grading formula. Official DepEd policy validation and real-device verification remain required before production use.
 - Not affiliated with the Department of Education.
@@ -113,3 +114,5 @@ Filters follow grade, school year, MATATAG rollout and the continuing Strengthen
 ## Forms Assistant
 
 Open a class → **Forms Assistant** to resolve missing inputs, paste learner or verified school records from Excel, reuse book and assessment data, review period-specific attendance, and generate selected forms as one reviewed pack. Approved mappings support SF1–SF10 and grade records. Pinned reference presets cover SF1, SF2, SF3 and SF8, with row/date capacity checks. School-wide and historical data require verified source rows and explicit coverage review. The new Excel writer preserves source workbook parts rather than rebuilding the layout. See [workflow and limits](docs/FORMS-ASSISTANT.md).
+
+Daily tools: see [Today, work tracking and notes](docs/DAILY-COMPANION.md). Intervention and consultation workflows are outside this app.

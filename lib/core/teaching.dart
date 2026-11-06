@@ -59,6 +59,7 @@ double? outcomePercent(
 ) {
   double got = 0, total = 0;
   for (final a in activities) {
+    if (a.workStates[learner] == 'excused') continue;
     final score = scores[a.id]?[learner];
     if (score != null) {
       got += score;

@@ -189,6 +189,9 @@ List<Learner> sortForForms(Iterable<Learner> list) {
 }
 
 class Activity {
+  // Hydrated from encrypted settings; included in backups.
+  String dueDate = '';
+  Map<String, String> workStates = {};
   final String id;
   final String classId;
   int term;

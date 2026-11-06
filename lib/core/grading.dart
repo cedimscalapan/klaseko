@@ -170,9 +170,9 @@ const weightPresets = <WeightPreset>[
 ];
 
 WeightPreset presetById(String id) => weightPresets.firstWhere(
-  (p) => p.id == id,
-  orElse: () => weightPresets.first,
-);
+      (p) => p.id == id,
+      orElse: () => weightPresets.first,
+    );
 
 /// Examination split under DO 015, s. 2026: ST1 30%, ST2 30%, Term Examination 40%.
 const exSplitWeights = {'st1': 30.0, 'st2': 30.0, 'te': 40.0};
@@ -335,14 +335,17 @@ class GradeEngine {
   double weightOf(String comp) => comp == 'ww'
       ? cls.ww
       : comp == 'pt'
-      ? cls.pt
-      : cls.ex;
+          ? cls.pt
+          : cls.ex;
 
   ComponentScore _sum(Iterable<Activity> acts, String learnerId) {
     var got = 0.0, hps = 0.0;
     for (final a in acts) {
+      if (a.workStates[learnerId] == 'excused') continue;
+      final score = scores[a.id]?[learnerId];
+      if (score == null) continue;
       hps += a.hps;
-      got += scores[a.id]?[learnerId] ?? 0;
+      got += score;
     }
     return ComponentScore(got, hps, hps > 0 ? got / hps * 100 : null);
   }
@@ -351,7 +354,8 @@ class GradeEngine {
     final acts = activities.where((a) => a.term == term).toList();
     var missing = 0;
     for (final a in acts) {
-      if (scores[a.id]?[learnerId] == null) missing++;
+      if (a.workStates[learnerId] != 'excused' &&
+          scores[a.id]?[learnerId] == null) missing++;
     }
     final comps = <String, ComponentScore>{};
     for (final c in ['ww', 'pt']) {
@@ -381,6 +385,9 @@ class GradeEngine {
     for (final c in ['ww', 'pt', 'ex']) {
       final w = weightOf(c);
       if (w <= 0) continue;
+      final assigned = acts.where((a) => a.comp == c).toList();
+      if (assigned.isNotEmpty &&
+          assigned.every((a) => a.workStates[learnerId] == 'excused')) continue;
       totalWeight += w;
       final ps = comps[c]!.ps;
       if (ps != null) {
@@ -390,7 +397,7 @@ class GradeEngine {
     }
     final hasData = usedWeight > 0;
     final ig = hasData ? round2(weighted / usedWeight) : 0.0;
-    final incomplete = usedWeight < totalWeight - 1e-9;
+    final incomplete = missing > 0 || usedWeight < totalWeight - 1e-9;
 
     final ov = overrides[learnerId]?[term];
     if (cls.mode == 'descriptive') {
@@ -413,8 +420,8 @@ class GradeEngine {
     final policy = TeachingPolicy.decode(cls.teachingPolicy);
     final converted =
         cls.transmute == 'raw' && hasData && policy.bands.isNotEmpty
-        ? policy.convert(ig)
-        : null;
+            ? policy.convert(ig)
+            : null;
     return TermResult(
       comps: comps,
       initialGrade: ig,
@@ -435,7 +442,8 @@ class GradeEngine {
         results,
         null,
         letters.isEmpty ? null : letters.last,
-        letters.length < terms,
+        letters.length < terms ||
+            results.any((r) => r.incomplete || r.missing > 0),
       );
     }
     final grades = results.map((r) => r.termGrade).whereType<int>().toList();
@@ -445,7 +453,7 @@ class GradeEngine {
       final assessed = results.where((r) => r.hasData).toList();
       final average =
           assessed.fold<double>(0, (sum, r) => sum + r.initialGrade) /
-          assessed.length;
+              assessed.length;
       return FinalResult(
         results,
         average.round(),
@@ -457,7 +465,12 @@ class GradeEngine {
       );
     }
     final avg = grades.reduce((a, b) => a + b) / grades.length;
-    return FinalResult(results, avg.round(), null, grades.length < terms);
+    return FinalResult(
+        results,
+        avg.round(),
+        null,
+        grades.length < terms ||
+            results.any((r) => r.incomplete || r.missing > 0));
   }
 }
 

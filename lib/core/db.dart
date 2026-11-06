@@ -10,6 +10,7 @@ import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'companion.dart';
 
 const _uuid = Uuid();
 String newId() => _uuid.v4();
@@ -67,35 +68,44 @@ class Repo {
       onUpgrade: (db, from, to) => _createFormTables(db),
       onCreate: (db, v) async {
         final b = db.batch();
-        b.execute('''CREATE TABLE classes(id TEXT PRIMARY KEY, sy TEXT, grade TEXT, section TEXT, subject TEXT,
+        b.execute(
+            '''CREATE TABLE classes(id TEXT PRIMARY KEY, sy TEXT, grade TEXT, section TEXT, subject TEXT,
         preset TEXT, ww REAL, pt REAL, ex REAL, ex_split INTEGER, transmute TEXT, mode TEXT, advisory INTEGER,
         created INTEGER, archived INTEGER DEFAULT 0)''');
-        b.execute('''CREATE TABLE learners(id TEXT PRIMARY KEY, class_id TEXT, num INTEGER, lrn TEXT, last TEXT,
+        b.execute(
+            '''CREATE TABLE learners(id TEXT PRIMARY KEY, class_id TEXT, num INTEGER, lrn TEXT, last TEXT,
         first TEXT, middle TEXT, sex TEXT, birth TEXT, address TEXT, guardian TEXT, contact TEXT, status TEXT,
         remarks TEXT)''');
         b.execute('CREATE INDEX learners_class ON learners(class_id)');
-        b.execute('''CREATE TABLE attendance(learner_id TEXT, class_id TEXT, day TEXT, status TEXT,
+        b.execute(
+            '''CREATE TABLE attendance(learner_id TEXT, class_id TEXT, day TEXT, status TEXT,
         PRIMARY KEY(learner_id, day))''');
         b.execute('CREATE INDEX attendance_class ON attendance(class_id, day)');
-        b.execute('''CREATE TABLE activities(id TEXT PRIMARY KEY, class_id TEXT, term INTEGER, comp TEXT, sub TEXT,
+        b.execute(
+            '''CREATE TABLE activities(id TEXT PRIMARY KEY, class_id TEXT, term INTEGER, comp TEXT, sub TEXT,
         title TEXT, hps REAL, day TEXT, exam_id TEXT, created INTEGER)''');
         b.execute('CREATE INDEX activities_class ON activities(class_id)');
         b.execute(
           'CREATE TABLE scores(activity_id TEXT, learner_id TEXT, score REAL, PRIMARY KEY(activity_id, learner_id))',
         );
-        b.execute('''CREATE TABLE exams(id TEXT PRIMARY KEY, class_id TEXT, term INTEGER, comp TEXT, sub TEXT,
+        b.execute(
+            '''CREATE TABLE exams(id TEXT PRIMARY KEY, class_id TEXT, term INTEGER, comp TEXT, sub TEXT,
         title TEXT, instructions TEXT, created INTEGER)''');
-        b.execute('''CREATE TABLE items(id TEXT PRIMARY KEY, exam_id TEXT, idx INTEGER, type TEXT, question TEXT,
+        b.execute(
+            '''CREATE TABLE items(id TEXT PRIMARY KEY, exam_id TEXT, idx INTEGER, type TEXT, question TEXT,
         choices TEXT, answer INTEGER, competency TEXT)''');
         b.execute('CREATE INDEX items_exam ON items(exam_id)');
-        b.execute('''CREATE TABLE responses(exam_id TEXT, learner_id TEXT, answers TEXT, score INTEGER, source TEXT,
+        b.execute(
+            '''CREATE TABLE responses(exam_id TEXT, learner_id TEXT, answers TEXT, score INTEGER, source TEXT,
         updated INTEGER, PRIMARY KEY(exam_id, learner_id))''');
-        b.execute('''CREATE TABLE overrides(class_id TEXT, learner_id TEXT, term INTEGER, value TEXT,
+        b.execute(
+            '''CREATE TABLE overrides(class_id TEXT, learner_id TEXT, term INTEGER, value TEXT,
         PRIMARY KEY(class_id, learner_id, term))''');
         b.execute(
           'CREATE TABLE sf9(learner_id TEXT, area TEXT, term INTEGER, grade TEXT, PRIMARY KEY(learner_id, area, term))',
         );
-        b.execute('''CREATE TABLE sf9_values(learner_id TEXT, behavior INTEGER, term INTEGER, rating TEXT,
+        b.execute(
+            '''CREATE TABLE sf9_values(learner_id TEXT, behavior INTEGER, term INTEGER, rating TEXT,
         PRIMARY KEY(learner_id, behavior, term))''');
         b.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)');
         await b.commit(noResult: true);
@@ -116,10 +126,13 @@ class Repo {
   Future<void> putSettings(Map<String, String> values) async {
     final b = db.batch();
     values.forEach(
-      (k, v) => b.insert('settings', {
-        'key': k,
-        'value': v,
-      }, conflictAlgorithm: ConflictAlgorithm.replace),
+      (k, v) => b.insert(
+          'settings',
+          {
+            'key': k,
+            'value': v,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace),
     );
     await b.commit(noResult: true);
   }
@@ -135,9 +148,8 @@ class Repo {
     final policies = await settings();
     return rows
         .map(
-          (r) =>
-              SchoolClass.fromMap(r)
-                ..teachingPolicy = policies['policy_${r['id']}'] ?? '',
+          (r) => SchoolClass.fromMap(r)
+            ..teachingPolicy = policies['policy_${r['id']}'] ?? '',
         )
         .toList();
   }
@@ -150,10 +162,10 @@ class Repo {
   }
 
   Future<void> saveClass(SchoolClass c) => db.insert(
-    'classes',
-    c.toMap(),
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+        'classes',
+        c.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
   Future<void> deleteClass(String id) async {
     await db.transaction((t) async {
@@ -179,6 +191,8 @@ class Repo {
           where: 'activity_id = ?',
           whereArgs: [a['id']],
         );
+        await t.delete('settings',
+            where: 'key = ?', whereArgs: ['work_${a['id']}']);
       }
       final learners = await t.query(
         'learners',
@@ -204,6 +218,15 @@ class Repo {
         await t.delete(table, where: 'class_id = ?', whereArgs: [id]);
       }
       await t.delete('classes', where: 'id = ?', whereArgs: [id]);
+      final notes =
+          await t.query('settings', where: 'key LIKE ?', whereArgs: ['note_%']);
+      for (final note in notes) {
+        if ((jsonDecode(note['value'] as String) as Map)['classId'] == id) {
+          await t
+              .delete('settings', where: 'key = ?', whereArgs: [note['key']]);
+        }
+      }
+      await t.delete('settings', where: 'key = ?', whereArgs: ['routine_$id']);
       await t.delete(
         'settings',
         where: 'key IN (?, ?)',
@@ -231,10 +254,10 @@ class Repo {
   }
 
   Future<void> saveLearner(Learner l) => db.insert(
-    'learners',
-    l.toMap(),
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+        'learners',
+        l.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
   Future<void> addLearners(String classId, List<Learner> list) async {
     var n = await nextLearnerNum(classId);
@@ -304,12 +327,15 @@ class Repo {
           whereArgs: [lid, day],
         );
       } else {
-        b.insert('attendance', {
-          'learner_id': lid,
-          'class_id': classId,
-          'day': day,
-          'status': s,
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        b.insert(
+            'attendance',
+            {
+              'learner_id': lid,
+              'class_id': classId,
+              'day': day,
+              'status': s,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace);
       }
     });
     await b.commit(noResult: true);
@@ -323,18 +349,98 @@ class Repo {
       whereArgs: [classId],
       orderBy: 'term, created',
     );
-    return rows.map(Activity.fromMap).toList();
+    final saved = await settings();
+    return rows.map((row) {
+      final activity = Activity.fromMap(row);
+      final meta = jsonDecode(saved['work_${activity.id}'] ?? '{}') as Map;
+      activity.dueDate = meta['due'] as String? ?? '';
+      activity.workStates =
+          Map<String, String>.from(meta['states'] as Map? ?? {});
+      return activity;
+    }).toList();
   }
 
   Future<void> saveActivity(Activity a) => db.insert(
-    'activities',
-    a.toMap(),
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+        'activities',
+        a.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
   Future<void> deleteActivity(String id) async {
     await db.delete('scores', where: 'activity_id = ?', whereArgs: [id]);
     await db.delete('activities', where: 'id = ?', whereArgs: [id]);
+    await db.delete('settings', where: 'key = ?', whereArgs: ['work_$id']);
+  }
+
+  Future<void> setWorkDueDate(String activityId, String due) async {
+    if (due.isNotEmpty &&
+        (DateTime.tryParse(due) == null ||
+            localDay(DateTime.parse(due)) != due)) {
+      throw const FormatException('Choose a valid due date.');
+    }
+    await db.transaction((t) async {
+      final rows = await t
+          .query('settings', where: 'key = ?', whereArgs: ['work_$activityId']);
+      final meta =
+          jsonDecode(rows.isEmpty ? '{}' : rows.first['value'] as String)
+              as Map;
+      meta['due'] = due;
+      await t.insert(
+          'settings', {'key': 'work_$activityId', 'value': jsonEncode(meta)},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  /// Status changes and score removal are atomic. A numeric zero is only an
+  /// explicit score, never a side effect of marking work missing.
+  Future<void> setWorkStatus(
+      String activityId, String learnerId, WorkStatus status) async {
+    if (status == WorkStatus.scored)
+      throw ArgumentError('Enter a score instead.');
+    await db.transaction((t) async {
+      final rows = await t
+          .query('settings', where: 'key = ?', whereArgs: ['work_$activityId']);
+      final meta =
+          jsonDecode(rows.isEmpty ? '{}' : rows.first['value'] as String)
+              as Map;
+      final states = Map<String, dynamic>.from(meta['states'] as Map? ?? {});
+      if (status == WorkStatus.unrecorded) {
+        states.remove(learnerId);
+      } else {
+        states[learnerId] = status.name;
+      }
+      meta['states'] = states;
+      if ([WorkStatus.unrecorded, WorkStatus.missing, WorkStatus.excused]
+          .contains(status)) {
+        await t.delete('scores',
+            where: 'activity_id = ? AND learner_id = ?',
+            whereArgs: [activityId, learnerId]);
+      }
+      await t.insert(
+          'settings', {'key': 'work_$activityId', 'value': jsonEncode(meta)},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  Future<List<ClassNote>> classNotes(String classId) async {
+    final saved = await settings();
+    final notes = saved.entries
+        .where((e) => e.key.startsWith('note_'))
+        .map((e) =>
+            ClassNote.fromJson(jsonDecode(e.value) as Map<String, dynamic>))
+        .where((n) => n.classId == classId)
+        .toList();
+    notes.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.updated.compareTo(a.updated);
+    });
+    return notes;
+  }
+
+  Future<void> saveClassNote(ClassNote note) =>
+      putSettings({'note_${note.id}': jsonEncode(note.toJson())});
+  Future<void> deleteClassNote(String id) async {
+    await db.delete('settings', where: 'key = ?', whereArgs: ['note_$id']);
   }
 
   /// activityId -> learnerId -> score
@@ -352,23 +458,39 @@ class Repo {
   }
 
   Future<void> setScores(String activityId, Map<String, double?> values) async {
-    final b = db.batch();
-    values.forEach((lid, v) {
-      if (v == null) {
-        b.delete(
-          'scores',
-          where: 'activity_id = ? AND learner_id = ?',
-          whereArgs: [activityId, lid],
-        );
-      } else {
-        b.insert('scores', {
-          'activity_id': activityId,
-          'learner_id': lid,
-          'score': v,
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
+    await db.transaction((t) async {
+      final rows = await t
+          .query('settings', where: 'key = ?', whereArgs: ['work_$activityId']);
+      final meta =
+          jsonDecode(rows.isEmpty ? '{}' : rows.first['value'] as String)
+              as Map;
+      final states = Map<String, dynamic>.from(meta['states'] as Map? ?? {});
+      final b = t.batch();
+      values.forEach((lid, v) {
+        if (v == null) {
+          b.delete(
+            'scores',
+            where: 'activity_id = ? AND learner_id = ?',
+            whereArgs: [activityId, lid],
+          );
+        } else {
+          if (states[lid] != 'late') states.remove(lid);
+          b.insert(
+              'scores',
+              {
+                'activity_id': activityId,
+                'learner_id': lid,
+                'score': v,
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      });
+      meta['states'] = states;
+      b.insert(
+          'settings', {'key': 'work_$activityId', 'value': jsonEncode(meta)},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+      await b.commit(noResult: true);
     });
-    await b.commit(noResult: true);
   }
 
   Future<Map<String, Map<int, String>>> overrides(String classId) async {
@@ -398,12 +520,15 @@ class Repo {
         whereArgs: [classId, learnerId, term],
       );
     } else {
-      await db.insert('overrides', {
-        'class_id': classId,
-        'learner_id': learnerId,
-        'term': term,
-        'value': value,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await db.insert(
+          'overrides',
+          {
+            'class_id': classId,
+            'learner_id': learnerId,
+            'term': term,
+            'value': value,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
@@ -488,6 +613,12 @@ class Repo {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     await syncExamActivity(r.examId);
+    final activities = await db
+        .query('activities', where: 'exam_id = ?', whereArgs: [r.examId]);
+    if (activities.isNotEmpty) {
+      await setScores(
+          activities.first['id'] as String, {r.learnerId: r.score.toDouble()});
+    }
   }
 
   Future<void> deleteResponse(String examId, String learnerId) async {
@@ -520,12 +651,11 @@ class Repo {
   Future<void> syncExamActivity(String examId) async {
     final exam = await examById(examId);
     if (exam == null) return;
-    final count =
-        (await db.rawQuery(
-              'SELECT COUNT(*) AS c FROM items WHERE exam_id = ?',
-              [examId],
-            )).first['c']
-            as int;
+    final count = (await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM items WHERE exam_id = ?',
+      [examId],
+    ))
+        .first['c'] as int;
     final rows = await db.query(
       'activities',
       where: 'exam_id = ?',
@@ -553,8 +683,12 @@ class Repo {
     await saveActivity(act);
     final resp = await responses(examId);
     await db.delete('scores', where: 'activity_id = ?', whereArgs: [act.id]);
+    final meta =
+        jsonDecode((await settings())['work_${act.id}'] ?? '{}') as Map;
+    final states = meta['states'] as Map? ?? {};
     final b = db.batch();
     for (final r in resp.values) {
+      if (['excused', 'missing'].contains(states[r.learnerId])) continue;
       b.insert('scores', {
         'activity_id': act.id,
         'learner_id': r.learnerId,
@@ -578,8 +712,7 @@ class Repo {
     final out = <String, Map<String, Map<int, String>>>{};
     for (final r in rows) {
       ((out[r['learner_id'] as String] ??= {})[r['area'] as String] ??=
-              {})[r['term'] as int] =
-          (r['grade'] ?? '') as String;
+          {})[r['term'] as int] = (r['grade'] ?? '') as String;
     }
     return out;
   }
@@ -597,12 +730,15 @@ class Repo {
         whereArgs: [learnerId, area, term],
       );
     } else {
-      await db.insert('sf9', {
-        'learner_id': learnerId,
-        'area': area,
-        'term': term,
-        'grade': grade,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await db.insert(
+          'sf9',
+          {
+            'learner_id': learnerId,
+            'area': area,
+            'term': term,
+            'grade': grade,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
@@ -627,12 +763,15 @@ class Repo {
     int term,
     String rating,
   ) async {
-    await db.insert('sf9_values', {
-      'learner_id': learnerId,
-      'behavior': behavior,
-      'term': term,
-      'rating': rating,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+        'sf9_values',
+        {
+          'learner_id': learnerId,
+          'behavior': behavior,
+          'term': term,
+          'rating': rating,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ---------- form layouts and archive ----------
@@ -689,7 +828,8 @@ class Repo {
     final same = await db.query(
       'form_archive',
       columns: ['id'],
-      where: 'class_id = ? AND form = ? AND title = ? AND period = ? AND sy = ? AND mime = ?',
+      where:
+          'class_id = ? AND form = ? AND title = ? AND period = ? AND sy = ? AND mime = ?',
       whereArgs: [e.classId, e.form, e.title, e.period, e.sy, e.mime],
     );
     final id = same.isEmpty ? newId() : same.first['id'] as String;
@@ -719,11 +859,11 @@ class Repo {
   }
 
   Future<void> setArchiveTerm(String id, int? term) => db.update(
-    'form_archive',
-    {'term': term},
-    where: 'id = ?',
-    whereArgs: [id],
-  );
+        'form_archive',
+        {'term': term},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
 
   Future<void> deleteArchive(ArchiveEntry e) async {
     await db.delete('form_archive', where: 'id = ?', whereArgs: [e.id]);

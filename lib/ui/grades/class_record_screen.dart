@@ -13,6 +13,7 @@ import '../forms/archive_info.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'score_entry_screen.dart';
+import '../companion/work_tracker_screen.dart';
 
 class RecordData {
   final List<Learner> learners;
@@ -25,9 +26,8 @@ Future<RecordData> loadRecord(SchoolClass cls) async {
   final repo = store.repo;
   final fresh = await repo.classById(cls.id) ?? cls;
   final acts = await repo.activities(cls.id);
-  final learners = (await repo.learners(cls.id))
-      .where((l) => l.isActive)
-      .toList();
+  final learners =
+      (await repo.learners(cls.id)).where((l) => l.isActive).toList();
   return RecordData(
     learners,
     acts,
@@ -95,6 +95,11 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
           children: [
+            NavRow(
+                icon: Icons.assignment_turned_in_outlined,
+                title: 'Work tracker',
+                subtitle: 'Follow up submissions and set optional due dates',
+                onTap: () => push(context, WorkTrackerScreen(cls: widget.cls))),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SegmentedButton<int>(
@@ -156,9 +161,9 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
                 onTap: a.examId != null
                     ? () => push(context, ExamDetailScreen(examId: a.examId!))
                     : () => push(
-                        context,
-                        ScoreEntryScreen(cls: cls, activity: a),
-                      ),
+                          context,
+                          ScoreEntryScreen(cls: cls, activity: a),
+                        ),
                 child: Row(
                   children: [
                     Expanded(
@@ -229,7 +234,7 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
       for (final l in d.learners) _gradeRow(context, d, l, term),
       const SizedBox(height: 8),
       Text(
-        'Blank scores count as zero. A grade marked "running" leaves out components with no activities yet. '
+        'Blank scores stay pending and are excluded from the running calculation. Only an entered 0 earns zero points. Excused work is excluded. A running grade is not final. '
         '${transmuteLabels[cls.transmute]}.',
         style: TextStyle(
           fontSize: 12,
@@ -272,7 +277,7 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
             if (r.missing > 0)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Pill('${r.missing} blank', color: lateAmber),
+                child: Pill('${r.missing} pending', color: lateAmber),
               ),
             SizedBox(
               width: 52,
@@ -285,8 +290,8 @@ class _ClassRecordScreenState extends State<ClassRecordScreen> {
                   color: tg != null
                       ? gradeColor(tg)
                       : (r.letter == 'D' || r.letter == 'E'
-                            ? penRed
-                            : brandBlue),
+                          ? penRed
+                          : brandBlue),
                 ),
               ),
             ),
@@ -461,7 +466,8 @@ void showBreakdown(BuildContext context, RecordData d, Learner l, int term) {
               labelText: cls.mode == 'descriptive'
                   ? 'Set letter grade (A-E), blank = computed'
                   : 'Override term grade, blank = computed',
-              helperText: 'Use only for an approved adjustment. It is marked in your records.',
+              helperText:
+                  'Use only for an approved adjustment. It is marked in your records.',
             ),
           ),
           const SizedBox(height: 12),
@@ -472,8 +478,8 @@ void showBreakdown(BuildContext context, RecordData d, Learner l, int term) {
                 final ok = cls.mode == 'descriptive'
                     ? ks1Letters.containsKey(v)
                     : (int.tryParse(v) != null &&
-                          int.parse(v) >= 60 &&
-                          int.parse(v) <= 100);
+                        int.parse(v) >= 60 &&
+                        int.parse(v) <= 100);
                 if (!ok) {
                   toast(
                     ctx,
@@ -565,8 +571,8 @@ Future<void> showActivitySheet(
                 hintText: c == 'ww'
                     ? 'e.g. Quiz 1'
                     : c == 'pt'
-                    ? 'e.g. Group project'
-                    : 'e.g. Summative Test 1',
+                        ? 'e.g. Group project'
+                        : 'e.g. Summative Test 1',
               ),
             ),
             const SizedBox(height: 10),
@@ -587,8 +593,7 @@ Future<void> showActivitySheet(
                   toast(ctx, 'Enter a title and an HPS above 0.');
                   return;
                 }
-                final a =
-                    existing ??
+                final a = existing ??
                     Activity(
                       id: newId(),
                       classId: cls.id,

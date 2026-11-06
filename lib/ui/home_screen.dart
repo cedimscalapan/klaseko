@@ -1,498 +1,460 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../core/export/form_data.dart';
+import '../core/companion.dart';
 import '../core/models.dart';
-import '../core/plan.dart';
 import 'attendance/attendance_screen.dart';
-import 'attention_screen.dart';
 import 'brand.dart';
 import 'classes/class_detail_screen.dart';
 import 'classes/class_form.dart';
 import 'classes/learners_screen.dart';
-import 'grades/class_record_screen.dart';
+import 'companion/class_notes_screen.dart';
+import 'companion/class_routine.dart';
+import 'companion/work_tracker_screen.dart';
 import 'settings/backup.dart';
-import 'settings/plan_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-class _ClassSummary {
+class _TodayClass {
+  const _TodayClass(this.cls, this.learners, this.routine, this.marked);
   final SchoolClass cls;
-  final int learners;
-  final int marked;
-  final int present;
-  final int unchecked;
-  final int belowPassing;
-  _ClassSummary(
-    this.cls,
-    this.learners,
-    this.marked,
-    this.present,
-    this.unchecked,
-    this.belowPassing,
-  );
-
-  bool get attendanceDone => learners > 0 && marked >= learners;
+  final int learners, marked;
+  final ClassRoutine routine;
 }
 
-class _HomeData {
-  final List<_ClassSummary> classes;
-  final int attention;
-  final String? backupReminder;
-
-  /// Days left when Plus ends within a week.
-  final int? planEnding;
-  _HomeData(this.classes, this.attention, this.backupReminder, this.planEnding);
+class _TodayData {
+  const _TodayData(this.classes, this.settings, this.actions);
+  final List<_TodayClass> classes;
+  final Map<String, String> settings;
+  final List<TodayAction> actions;
 }
 
-Color classColor(int i) => palette.classColors[i % palette.classColors.length];
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.onGo});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, required this.onGo, this.active = true});
   final void Function(int tab) onGo;
+  final bool active;
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-  Future<_HomeData> _load() async {
-    final repo = store.repo;
-    final today = dayKey(DateTime.now());
-    final out = <_ClassSummary>[];
-    var attention = 0;
-    for (final c in await repo.classes()) {
-      final learners = (await repo.learners(c.id))
-          .where((l) => l.isActive)
-          .toList();
-      final att =
-          (await repo.attendance(c.id, from: today, to: today))[today] ?? {};
-      var unchecked = 0;
-      for (final e in await repo.exams(classId: c.id)) {
-        if ((await repo.items(e.id)).isEmpty) continue;
-        final resp = await repo.responses(e.id);
-        unchecked += learners.where((l) => !resp.containsKey(l.id)).length;
-      }
-      final rows = await attentionFor(c, learners);
-      attention += rows.length;
-      out.add(
-        _ClassSummary(
-          c,
-          learners.length,
-          att.length,
-          att.values.where((s) => s != 'A').length,
-          unchecked,
-          rows.where((r) => r.grade != null).length,
-        ),
-      );
-    }
-    final left = (await Plan.status()).daysLeft;
-    return _HomeData(
-      out,
-      attention,
-      backupReminder(await repo.settings(), [for (final s in out) s.cls]),
-      left != null && left <= 7 ? left : null,
-    );
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  Timer? timer;
+  int revision = 0;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (widget.active) refresh();
+    });
+  }
+
+  void refresh() {
+    if (mounted) setState(() => revision++);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final hour = DateTime.now().hour;
-    final greet = hour < 12
-        ? 'Magandang umaga'
-        : hour < 18
-        ? 'Magandang hapon'
-        : 'Magandang gabi';
-    final name = store.profile.teacher.trim().split(' ').first;
-    final weekend = DateTime.now().weekday > DateTime.friday;
-    return Scaffold(
-      body: SafeArea(
-        child: Loader<_HomeData>(
-          load: _load,
-          builder: (context, data) {
-            final classes = data.classes;
-            final all = [for (final c in classes) c.cls];
-            final noLearners = [
-              for (final c in classes)
-                if (c.learners == 0) c.cls,
-            ];
-            final pending = [
-              for (final c in classes)
-                if (c.learners > 0 && !c.attendanceDone) c.cls,
-            ];
-            final unchecked = classes.fold<int>(0, (a, c) => a + c.unchecked);
-            void takeAttendance(List<SchoolClass> from) => pickClass(
-              context,
-              from,
-              'Take attendance',
-              (c) => push(context, AttendanceScreen(cls: c)),
-            );
-            final tasks = <(String, String, bool, VoidCallback)>[
-              if (noLearners.isNotEmpty)
-                (
-                  'Add your learners',
-                  noLearners.length == 1
-                      ? '${noLearners.first.title} has no learners yet'
-                      : '${noLearners.length} classes have no learners yet',
-                  false,
-                  () => pickClass(
-                    context,
-                    noLearners,
-                    'Add learners',
-                    (c) => push(context, ImportLearnersScreen(cls: c)),
-                  ),
-                ),
-              if (!weekend && noLearners.length < classes.length)
-                (
-                  'Take attendance',
-                  pending.isEmpty
-                      ? 'Done for all classes'
-                      : pending.length == 1
-                      ? '${pending.first.title} is left today'
-                      : '${pending.length} classes left today',
-                  pending.isEmpty,
-                  () => takeAttendance(pending.isEmpty ? all : pending),
-                ),
-              (
-                'Check papers',
-                unchecked == 0
-                    ? 'No papers waiting'
-                    : unchecked == 1
-                    ? '1 paper waiting'
-                    : '$unchecked papers waiting',
-                unchecked == 0,
-                () => onGo(2),
-              ),
-            ];
-
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(2, 4, 2, 18),
-                  child: Row(
-                    children: [
-                      const BrandLogo(size: 34),
-                      const Spacer(),
-                      Tooltip(
-                        message: 'Records stay on this device',
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: cardColor(context),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outlineVariant,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.verified_user_outlined,
-                            size: 20,
-                            color: brandBlue,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                HeroHeader(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                              style: TextStyle(
-                                color: Colors.white.withAlpha(210),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(40),
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: Text(
-                              'SY ${store.profile.sy}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '$greet${name.isEmpty ? '' : ', $name'}!',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          height: 1.2,
-                        ),
-                      ),
-                      if (store.profile.schoolName.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            store.profile.schoolName,
-                            style: TextStyle(
-                              color: Colors.white.withAlpha(200),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          HeroAction(
-                            icon: Icons.fact_check_rounded,
-                            label: 'Attendance',
-                            onTap: () => classes.isEmpty
-                                ? push(context, const ClassFormScreen())
-                                : takeAttendance(
-                                    pending.isEmpty ? all : pending,
-                                  ),
-                          ),
-                          const SizedBox(width: 10),
-                          HeroAction(
-                            icon: Icons.document_scanner_rounded,
-                            label: 'Check papers',
-                            onTap: () => onGo(2),
-                          ),
-                          const SizedBox(width: 10),
-                          HeroAction(
-                            icon: Icons.edit_note_rounded,
-                            label: 'Add scores',
-                            onTap: () => classes.isEmpty
-                                ? push(context, const ClassFormScreen())
-                                : pickClass(
-                                    context,
-                                    all,
-                                    'Add scores',
-                                    (c) => push(
-                                      context,
-                                      ClassRecordScreen(cls: c),
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                if (classes.isEmpty) ...[
-                  const SizedBox(height: 16),
-                  AppCard(
-                    child: EmptyState(
-                      icon: Icons.groups_rounded,
-                      title: 'Add your first class',
-                      message: 'A class is one section and subject, for example Grade 8 - Sampaguita, Mathematics.',
-                      action: FilledButton.icon(
-                        onPressed: () => push(context, const ClassFormScreen()),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add class'),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  const SectionTitle('To do today'),
-                  AppCard(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-                    child: Column(
-                      children: [for (final t in tasks) _task(context, t)],
-                    ),
-                  ),
-                  if (data.attention > 0 ||
-                      data.backupReminder != null ||
-                      data.planEnding != null)
-                    const SizedBox(height: 10),
-                  if (data.planEnding != null)
-                    NavRow(
-                      icon: Icons.workspace_premium_rounded,
-                      title: data.planEnding == 0
-                          ? 'KlaseKo Plus ends today'
-                          : 'KlaseKo Plus ends in ${data.planEnding} ${data.planEnding == 1 ? 'day' : 'days'}',
-                      subtitle: 'Your records stay either way. Extend it to keep unlimited scans.',
-                      color: lateAmber,
-                      onTap: () => push(context, const PlanScreen()),
-                    ),
-                  if (data.attention > 0)
-                    NavRow(
-                      icon: Icons.volunteer_activism_rounded,
-                      title: data.attention == 1
-                          ? '1 learner needs help'
-                          : '${data.attention} learners need help',
-                      subtitle: 'Grades below 75 or many absences',
-                      color: penRed,
-                      onTap: () => push(context, const AttentionScreen()),
-                    ),
-                  if (data.backupReminder != null)
-                    NavRow(
-                      icon: Icons.backup_rounded,
-                      title: 'Back up your records',
-                      subtitle: data.backupReminder,
-                      color: lateAmber,
-                      onTap: () => backUpNow(context),
-                    ),
-                  SectionTitle(
-                    'Your classes',
-                    trailing: TextButton(
-                      onPressed: () => onGo(1),
-                      child: const Text('See all'),
-                    ),
-                  ),
-                  for (var i = 0; i < classes.length; i++)
-                    _classCard(context, classes[i], i, weekend),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) revision++;
   }
 
-  Widget _task(BuildContext context, (String, String, bool, VoidCallback) t) =>
-      InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: t.$4,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Icon(
-                t.$3
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: t.$3 ? goodGreen : mutedText(context),
-                size: 26,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      t.$1,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: t.$3 ? mutedText(context) : null,
-                      ),
-                    ),
-                    Text(
-                      t.$2,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: mutedText(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!t.$3)
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-            ],
-          ),
-        ),
-      );
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) refresh();
+  }
 
-  Widget _classCard(
-    BuildContext context,
-    _ClassSummary c,
-    int i,
-    bool weekend,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: AppCard(
-      onTap: () => push(context, ClassDetailScreen(classId: c.cls.id)),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: classColor(i).withAlpha(isDark(context) ? 60 : 30),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              gradeShort(c.cls.grade),
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                color: classColor(i),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  c.cls.title,
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  '${c.cls.subject} · ${c.learners} learners',
-                  style: TextStyle(fontSize: 13, color: mutedText(context)),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    if (c.attendanceDone)
-                      Pill(
-                        '${c.present}/${c.learners} present',
-                        color: goodGreen,
-                        icon: Icons.check_rounded,
-                      )
-                    else if (c.marked > 0)
-                      Pill(
-                        '${c.learners - c.marked} left to mark',
-                        color: lateAmber,
-                        icon: Icons.schedule_rounded,
-                      )
-                    else if (!weekend && c.learners > 0)
-                      Pill(
-                        'No attendance yet',
-                        color: lateAmber,
-                        icon: Icons.schedule_rounded,
-                      ),
-                    if (c.unchecked > 0)
-                      Pill(
-                        '${c.unchecked} to check',
-                        color: brandBlue,
-                        icon: Icons.document_scanner_rounded,
-                      ),
-                    if (c.belowPassing > 0)
-                      Pill(
-                        '${c.belowPassing} below 75',
-                        color: penRed,
-                        icon: Icons.trending_down_rounded,
-                      ),
+  @override
+  void dispose() {
+    timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<_TodayData> load() async {
+    final repo = store.repo;
+    final today = DateTime.now();
+    final day = localDay(today);
+    final settings = await repo.settings();
+    final prefs = TodayPreferences.fromSettings(settings);
+    final classes = <_TodayClass>[];
+    final actions = <TodayAction>[];
+    for (final cls in await repo.classes()) {
+      final learners =
+          (await repo.learners(cls.id)).where((l) => l.isActive).toList();
+      final routine = ClassRoutine.decode(settings['routine_${cls.id}']);
+      final attendance =
+          (await repo.attendance(cls.id, from: day, to: day))[day] ?? {};
+      final marked = learners.where((l) => attendance.containsKey(l.id)).length;
+      classes.add(_TodayClass(cls, learners.length, routine, marked));
+      final detail = '${cls.title} · ${cls.subject}';
+      if (prefs.reminders) {
+        for (final note in await repo.classNotes(cls.id)) {
+          if (note.done ||
+              note.remindOn.isEmpty ||
+              note.remindOn.compareTo(day) > 0) continue;
+          actions.add(TodayAction(
+              id: 'note_${note.id}',
+              kind: 'note',
+              classId: cls.id,
+              title: 'Your class reminder',
+              detail: '$detail\n${note.text}',
+              priority: 1,
+              noteId: note.id));
+        }
+      }
+      if (learners.isEmpty) {
+        actions.add(TodayAction(
+            id: 'learners_${cls.id}',
+            kind: 'learners',
+            classId: cls.id,
+            title: 'Add a class list',
+            detail: detail,
+            priority: 0));
+        continue;
+      }
+      if (prefs.attendance &&
+          routine.occursOn(today) &&
+          marked < learners.length) {
+        actions.add(TodayAction(
+            id: 'attendance_${cls.id}',
+            kind: 'attendance',
+            classId: cls.id,
+            title: marked == 0 ? 'Take attendance' : 'Finish attendance',
+            detail: '$detail · ${learners.length - marked} to mark',
+            priority: 2,
+            minute: routine.minute ?? 24 * 60));
+      }
+      final activities = await repo.activities(cls.id);
+      final entries =
+          workEntries(activities, learners, await repo.scores(cls.id), today);
+      final missing =
+          entries.where((e) => e.status == WorkStatus.missing).toList();
+      if (missing.isNotEmpty) {
+        actions.add(TodayAction(
+            id: 'missing_${cls.id}',
+            kind: 'missing',
+            classId: cls.id,
+            activityId: missing.first.activity.id,
+            title: 'Follow up missing work',
+            detail: '$detail · ${missing.length} missing submissions',
+            priority: 3));
+      }
+      final awaiting = entries.where((e) => e.awaitingScore).toList();
+      if (awaiting.isNotEmpty) {
+        actions.add(TodayAction(
+            id: 'scoring_${cls.id}',
+            kind: 'scoring',
+            classId: cls.id,
+            title: 'Score received work',
+            detail: '$detail · ${awaiting.length} awaiting scores',
+            priority: 4));
+      }
+    }
+    if (prefs.backupReminders) {
+      final backup =
+          backupReminder(settings, classes.map((c) => c.cls).toList());
+      if (backup != null)
+        actions.add(TodayAction(
+            id: 'backup',
+            kind: 'backup',
+            classId: '',
+            title: 'Back up your records',
+            detail: backup,
+            priority: 5));
+    }
+    classes.sort((a, b) {
+      final aToday = a.routine.occursOn(today),
+          bToday = b.routine.occursOn(today);
+      if (aToday != bToday) return aToday ? -1 : 1;
+      return (a.routine.minute ?? 1440).compareTo(b.routine.minute ?? 1440);
+    });
+    return _TodayData(classes, settings, actions);
+  }
+
+  void act(_TodayData data, TodayAction action) {
+    if (action.kind == 'backup') {
+      backUpNow(context);
+      return;
+    }
+    final cls = data.classes.firstWhere((c) => c.cls.id == action.classId).cls;
+    switch (action.kind) {
+      case 'learners':
+        push(context, ImportLearnersScreen(cls: cls));
+      case 'attendance':
+        push(context, AttendanceScreen(cls: cls));
+      case 'missing':
+        push(context, WorkTrackerScreen(cls: cls));
+      case 'scoring':
+        push(context,
+            WorkTrackerScreen(cls: cls, initialFilter: 'Awaiting score'));
+      case 'note':
+        push(context, ClassNotesScreen(cls: cls));
+    }
+  }
+
+  Future<void> options(_TodayData data) async {
+    final prefs = TodayPreferences.fromSettings(data.settings);
+    var reminders = prefs.reminders, attendance = prefs.attendance;
+    var backupReminders = prefs.backupReminders;
+    final result = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+            builder: (ctx, update) => AlertDialog(
+                  title: const Text('Make Today yours'),
+                  content: SizedBox(
+                      width: 420,
+                      child: SingleChildScrollView(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                        SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Suggest attendance'),
+                            subtitle: const Text(
+                                'Uses your optional class routine; otherwise Monday to Friday.'),
+                            value: attendance,
+                            onChanged: (v) => update(() => attendance = v)),
+                        SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Note reminders'),
+                            subtitle: const Text(
+                                'Only inside Today, when you open the app. You can dismiss any suggestion for the day.'),
+                            value: reminders,
+                            onChanged: (v) => update(() => reminders = v)),
+                        SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Backup reminders'),
+                            subtitle: const Text(
+                                'An occasional suggestion to save an encrypted backup.'),
+                            value: backupReminders,
+                            onChanged: (v) =>
+                                update(() => backupReminders = v)),
+                        TextButton(
+                            onPressed: () async {
+                              await store.repo.putSettings({
+                                for (final key in data.settings.keys.where(
+                                    (k) => k.startsWith('today_dismiss_')))
+                                  key: ''
+                              });
+                              store.changed();
+                              if (ctx.mounted) Navigator.pop(ctx, true);
+                            },
+                            child:
+                                const Text('Show dismissed suggestions again')),
+                      ]))),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Save'))
                   ],
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: mutedText(context)),
-        ],
-      ),
-    ),
-  );
+                )));
+    if (result != true) return;
+    await store.repo.putSettings({
+      'today_reminders': reminders ? '1' : '0',
+      'today_backup_reminders': backupReminders ? '1' : '0',
+      'today_attendance': attendance ? '1' : '0'
+    });
+    store.changed();
+  }
+
+  Future<void> dismiss(TodayAction action) async {
+    await store.repo
+        .putSettings({'today_dismiss_${action.id}': localDay(DateTime.now())});
+    store.changed();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      body: SafeArea(
+          child: Loader<_TodayData>(
+              key: ValueKey(revision),
+              load: load,
+              builder: (context, data) {
+                final today = DateTime.now();
+                final next =
+                    nextTodayAction(data.actions, data.settings, today);
+                final all = data.classes.map((c) => c.cls).toList();
+                final todays = data.classes
+                    .where((c) => c.routine.occursOn(today))
+                    .toList();
+                final hour = today.hour;
+                final greeting = hour < 12
+                    ? 'Magandang umaga'
+                    : hour < 18
+                        ? 'Magandang hapon'
+                        : 'Magandang gabi';
+                final name = store.profile.teacher.trim().split(' ').first;
+                void choose(String title, void Function(SchoolClass) action) {
+                  if (all.isEmpty) {
+                    push(context, const ClassFormScreen());
+                    return;
+                  }
+                  pickClass(context, all, title, action);
+                }
+
+                return RefreshIndicator(
+                    onRefresh: () async => refresh(),
+                    child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                        children: [
+                          Row(children: [
+                            const BrandLogo(size: 34),
+                            const Spacer(),
+                            const Tooltip(
+                                message: 'Saved on this device · works offline',
+                                child: Icon(Icons.verified_user_outlined,
+                                    size: 22)),
+                            const SizedBox(width: 8),
+                            IconButton(
+                                tooltip: 'Today options',
+                                onPressed: () => options(data),
+                                icon: const Icon(Icons.tune_rounded))
+                          ]),
+                          const SizedBox(height: 14),
+                          HeroHeader(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(DateFormat('EEEE, MMMM d').format(today),
+                                    style: TextStyle(
+                                        color: Colors.white.withAlpha(215))),
+                                const SizedBox(height: 8),
+                                Text(
+                                    '$greeting${name.isEmpty ? '' : ', $name'}!',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 26)),
+                                const SizedBox(height: 8),
+                                const Text(
+                                    'A little less paperwork. More time to teach.',
+                                    style: TextStyle(color: Colors.white)),
+                              ])),
+                          const SectionTitle('Your next step'),
+                          if (next != null)
+                            AppCard(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                            child: Text(next.title,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleLarge
+                                                    ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w700))),
+                                        IconButton(
+                                            tooltip: 'Dismiss for today',
+                                            onPressed: () => dismiss(next),
+                                            icon:
+                                                const Icon(Icons.close_rounded))
+                                      ]),
+                                  const SizedBox(height: 4),
+                                  Text(next.detail,
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: mutedText(context),
+                                          height: 1.5)),
+                                  const SizedBox(height: 16),
+                                  FilledButton.icon(
+                                      onPressed: () => act(data, next),
+                                      icon: const Icon(
+                                          Icons.arrow_forward_rounded),
+                                      label: Text(next.kind == 'attendance'
+                                          ? 'Open attendance'
+                                          : next.kind == 'missing'
+                                              ? 'Open missing work'
+                                              : next.kind == 'scoring'
+                                                  ? 'Review submissions'
+                                                  : next.kind == 'note'
+                                                      ? 'Open class notes'
+                                                      : next.kind == 'backup'
+                                                          ? 'Make backup'
+                                                          : 'Add learners')),
+                                ]))
+                          else
+                            AppCard(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(
+                                      all.isEmpty
+                                          ? 'Start with one class'
+                                          : 'You have room to focus',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge),
+                                  const SizedBox(height: 8),
+                                  Text(all.isEmpty
+                                      ? 'Add your class and use the same learner list for attendance, scores and forms.'
+                                      : 'No more suggestions for today. Your class tools are always available below.'),
+                                  if (all.isEmpty)
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 12),
+                                        child: FilledButton.icon(
+                                            onPressed: () => push(context,
+                                                const ClassFormScreen()),
+                                            icon: const Icon(Icons.add),
+                                            label: const Text('Add class'))),
+                                ])),
+                          const SectionTitle('Quick actions'),
+                          Wrap(spacing: 8, runSpacing: 8, children: [
+                            OutlinedButton.icon(
+                                onPressed: () => choose(
+                                    'Take attendance',
+                                    (c) => push(
+                                        context, AttendanceScreen(cls: c))),
+                                icon: const Icon(Icons.fact_check_outlined),
+                                label: const Text('Attendance')),
+                            OutlinedButton.icon(
+                                onPressed: () => widget.onGo(2),
+                                icon:
+                                    const Icon(Icons.document_scanner_outlined),
+                                label: const Text('Check papers')),
+                            OutlinedButton.icon(
+                                onPressed: () => choose('Note for which class?',
+                                    (c) => quickClassNote(context, c)),
+                                icon: const Icon(Icons.edit_note_rounded),
+                                label: const Text('Quick note')),
+                          ]),
+                          SectionTitle('Today’s classes',
+                              trailing: TextButton(
+                                  onPressed: () => widget.onGo(1),
+                                  child: const Text('See all'))),
+                          if (all.isNotEmpty && todays.isEmpty)
+                            const Padding(
+                                padding: EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                    'No classes in your usual routine today. Open Classes to work on any class.')),
+                          for (final c in todays)
+                            NavRow(
+                                icon: Icons.auto_stories_outlined,
+                                title: '${c.cls.title} · ${c.cls.subject}',
+                                subtitle:
+                                    '${c.routine.minute == null ? '' : '${TimeOfDay(hour: c.routine.minute! ~/ 60, minute: c.routine.minute! % 60).format(context)} · '}${c.learners} learners',
+                                onTap: () => push(context,
+                                    ClassDetailScreen(classId: c.cls.id))),
+                          if (all.isNotEmpty)
+                            TextButton.icon(
+                                onPressed: () => choose(
+                                    'Set an optional class routine',
+                                    (c) => editClassRoutine(context, c)),
+                                icon: const Icon(Icons.schedule_outlined),
+                                label: const Text('Set class days and time')),
+                        ]));
+              })));
 }

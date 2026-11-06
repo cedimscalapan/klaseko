@@ -860,9 +860,9 @@ Future<Uint8List> buildGradeSheetPdf({
     return pw.TableRow(children: [
       _cell('$no', size: 7),
       _cell(l.fullName, size: 7, align: pw.Alignment.centerLeft),
-      for (final t in f.terms) _cell(t.display, size: 7.5),
-      _cell(f.finalGrade?.toString() ?? f.letter ?? '', size: 7.5, bold: true),
-      _cell(f.finalGrade == null ? '' : descriptor(f.finalGrade!, legacy: cls.legacyRules), size: 6.5),
+      for (final t in f.terms) _cell('${t.display}${t.hasData && t.incomplete ? ' (running)' : ''}', size: 7.5),
+      _cell(f.partial ? 'In progress' : f.finalGrade?.toString() ?? f.letter ?? '', size: 7.5, bold: true),
+      _cell(f.partial || f.finalGrade == null ? '' : descriptor(f.finalGrade!, legacy: cls.legacyRules), size: 6.5),
       _cell(f.remarks, size: 6.5, color: f.remarks == 'Failed' ? PdfColors.red800 : null),
     ]);
   }

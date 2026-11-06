@@ -12,6 +12,9 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../teaching_screen.dart';
 import '../forms/forms_assistant_screen.dart';
+import '../companion/class_notes_screen.dart';
+import '../companion/class_routine.dart';
+import '../companion/work_tracker_screen.dart';
 import 'class_form.dart';
 import 'learners_screen.dart';
 
@@ -244,6 +247,24 @@ class ClassDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               NavRow(
+                icon: Icons.assignment_turned_in_outlined,
+                title: 'Work tracker',
+                subtitle: 'Missing, received, late and excused work',
+                onTap: () => push(context, WorkTrackerScreen(cls: c)),
+              ),
+              NavRow(
+                icon: Icons.edit_note_rounded,
+                title: 'Class notes',
+                subtitle: 'Lesson reminders and quick notes, saved offline',
+                onTap: () => push(context, ClassNotesScreen(cls: c)),
+              ),
+              NavRow(
+                icon: Icons.schedule_outlined,
+                title: 'Class routine',
+                subtitle: 'Optional days and start time for Today',
+                onTap: () => editClassRoutine(context, c),
+              ),
+              NavRow(
                   icon: Icons.auto_awesome_outlined,
                   title: 'Forms Assistant',
                   subtitle:
@@ -252,8 +273,7 @@ class ClassDetailScreen extends StatelessWidget {
               NavRow(
                 icon: Icons.school,
                 title: 'Teaching workspace',
-                subtitle:
-                    'School policy, rubrics, outcomes, support and reports',
+                subtitle: 'School policy, rubrics, outcomes and reports',
                 onTap: () => push(context, TeachingScreen(cls: c)),
               ),
               NavRow(

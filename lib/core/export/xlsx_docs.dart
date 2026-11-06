@@ -254,7 +254,7 @@ Uint8List buildClassRecordXlsx(SchoolProfile p, SchoolClass cls, List<Learner> l
         void scores(List<Activity> list, String comp, bool withTotal) {
           for (final a in list) {
             final s = engine.scores[a.id]?[l.id];
-            b.put(cc++, r, s == null ? '' : (s == s.roundToDouble() ? s.toInt() : s), center: true, border: true);
+            b.put(cc++, r, a.workStates[l.id] == 'excused' ? 'EXC' : s == null ? '' : (s == s.roundToDouble() ? s.toInt() : s), center: true, border: true);
           }
           final cs = res.comps[comp]!;
           if (withTotal) b.put(cc++, r, cs.got == cs.got.roundToDouble() ? cs.got.toInt() : cs.got, center: true, border: true);
@@ -266,10 +266,11 @@ Uint8List buildClassRecordXlsx(SchoolProfile p, SchoolClass cls, List<Learner> l
         scores(pt, 'pt', true);
         scores(ex, 'ex', false);
         b.put(cc++, r, res.hasData ? res.initialGrade : '', center: true, border: true);
-        b.put(cc, r, res.display, center: true, border: true, bold: true);
+        b.put(cc, r, '${res.display}${res.hasData && res.incomplete ? ' (running)' : ''}', center: true, border: true, bold: true);
         r++;
       }
     }
+    b.put(0, r + 1, 'Blank = pending; EXC = excused. Running grades exclude pending and excused work and are not final.', size: 8);
     b.width(0, 32);
   }
 
@@ -288,11 +289,12 @@ Uint8List buildClassRecordXlsx(SchoolProfile p, SchoolClass cls, List<Learner> l
     b.put(0, r, ++no, center: true, border: true);
     b.put(1, r, l.fullName, border: true);
     for (var t = 0; t < p.terms; t++) {
-      final d = f.terms[t].display;
+      final result = f.terms[t];
+      final d = '${result.display}${result.hasData && result.incomplete ? ' (running)' : ''}';
       b.put(2 + t, r, int.tryParse(d) ?? d, center: true, border: true);
     }
-    b.put(2 + p.terms, r, f.finalGrade ?? f.letter ?? '', center: true, border: true, bold: true);
-    b.put(3 + p.terms, r, f.finalGrade == null ? '' : descriptor(f.finalGrade!, legacy: cls.legacyRules), center: true, border: true);
+    b.put(2 + p.terms, r, f.partial ? 'In progress' : f.finalGrade ?? f.letter ?? '', center: true, border: true, bold: true);
+    b.put(3 + p.terms, r, f.partial || f.finalGrade == null ? '' : descriptor(f.finalGrade!, legacy: cls.legacyRules), center: true, border: true);
     b.put(4 + p.terms, r, f.remarks, center: true, border: true);
     r++;
   }

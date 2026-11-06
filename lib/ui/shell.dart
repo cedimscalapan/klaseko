@@ -36,7 +36,7 @@ class _ShellState extends State<Shell> {
           final pages = IndexedStack(
             index: _tab,
             children: [
-              HomeScreen(onGo: go),
+              HomeScreen(onGo: go, active: _tab == 0),
               const ClassesScreen(),
               const CheckHubScreen(),
               const MoreScreen(),

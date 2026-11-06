@@ -10,7 +10,6 @@ import '../core/models.dart';
 import '../core/teaching.dart';
 import '../core/grading.dart';
 import '../core/export/share.dart';
-import '../core/export/form_data.dart' show dayKey;
 import 'widgets.dart';
 import 'grades/score_entry_screen.dart';
 import 'forms/official_forms_screen.dart';
@@ -30,7 +29,6 @@ class _TeachingScreenState extends State<TeachingScreen> {
   List<Learner> learners = [];
   Map<String, Map<String, double>> scores = {};
   bool ready = false;
-  Map<String, int> absences = {};
   String get key => 'teaching_${widget.cls.id}';
   List<Map<String, dynamic>> rows(String name) => ((data[name] as List?) ?? [])
       .map((e) => Map<String, dynamic>.from(e as Map))
@@ -52,14 +50,6 @@ class _TeachingScreenState extends State<TeachingScreen> {
         .where((l) => l.isActive)
         .toList();
     scores = await store.repo.scores(widget.cls.id);
-    final attendance = await store.repo.attendance(widget.cls.id);
-    absences = {};
-    for (final day in attendance.values) {
-      for (final entry in day.entries) {
-        if (entry.value == 'A')
-          absences[entry.key] = (absences[entry.key] ?? 0) + 1;
-      }
-    }
     if (mounted) setState(() => ready = true);
   }
 
@@ -167,19 +157,6 @@ class _TeachingScreenState extends State<TeachingScreen> {
   }
 
   void error(String text) => toast(context, text);
-  String supportSummary(Learner learner) {
-    final percent = outcomePercent(acts, scores, learner.id);
-    final missing = acts.where((a) => scores[a.id]?[learner.id] == null).length;
-    final count = rows('support')
-        .where(
-          (r) =>
-              r['learner'] == learner.id &&
-              r['Status (open/resolved)'] == 'open',
-        )
-        .length;
-    return '$count open plans · ${absences[learner.id] ?? 0} absences · $missing unrecorded scores${percent != null && percent < policy.passing ? ' · Review learning support' : ''}';
-  }
-
   Future<void> editPolicy() async {
     final r = await form('School and grading policy', {
       'Sector (DepEd / Private K–12 / Higher Education)': policy.sector,
@@ -434,36 +411,6 @@ class _TeachingScreenState extends State<TeachingScreen> {
     await save();
   }
 
-  Future<void> addSupport(Learner l) async {
-    final r = await form(
-      policy.sector == 'Higher Education'
-          ? 'Student consultation'
-          : 'Learner intervention',
-      {
-        'Concern': '',
-        'Action / support plan': '',
-        'Review date (YYYY-MM-DD)': dayKey(
-          DateTime.now().add(const Duration(days: 14)),
-        ),
-        'Progress / follow-up': '',
-        'Status (open/resolved)': 'open',
-      },
-    );
-    if (r == null) return;
-    if (r['Concern']!.isEmpty ||
-        r['Action / support plan']!.isEmpty ||
-        DateTime.tryParse(r['Review date (YYYY-MM-DD)']!) == null ||
-        !['open', 'resolved'].contains(r['Status (open/resolved)'])) {
-      error('Enter a concern, action, valid review date and status.');
-      return;
-    }
-    data['support'] = [
-      ...rows('support'),
-      {'id': newId(), 'learner': l.id, ...r},
-    ];
-    await save();
-  }
-
   Future<void> reportTemplate() async {
     final r = await form('Reusable report template', {
       'Title': data['reportTitle'] as String? ?? 'Grade sheet',
@@ -645,7 +592,7 @@ class _TeachingScreenState extends State<TeachingScreen> {
             ? 'Incomplete'
             : finalPercent >= policy.passing
                 ? 'Passed'
-                : 'Needs support',
+                : 'Below target',
       };
       lines.add(cols.map((c) => cell(row[c])).join(','));
     }
@@ -658,7 +605,7 @@ class _TeachingScreenState extends State<TeachingScreen> {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-        length: 5,
+        length: 4,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('Teaching workspace'),
@@ -674,10 +621,6 @@ class _TeachingScreenState extends State<TeachingScreen> {
                 Tab(
                   icon: Icon(Icons.track_changes_rounded, size: 20),
                   text: 'Outcomes',
-                ),
-                Tab(
-                  icon: Icon(Icons.volunteer_activism_outlined, size: 20),
-                  text: 'Support',
                 ),
                 Tab(
                   icon: Icon(Icons.description_outlined, size: 20),
@@ -774,64 +717,12 @@ class _TeachingScreenState extends State<TeachingScreen> {
                                       subtitle: Text(
                                         p == null
                                             ? 'No assessed evidence'
-                                            : '${p.toStringAsFixed(1)}% · ${p >= (o['target'] as num) ? 'Target met' : 'Needs support'}',
+                                            : '${p.toStringAsFixed(1)}% · ${p >= (o['target'] as num) ? 'Target met' : 'Below target'}',
                                       ),
-                                      onTap: () => addSupport(l),
                                     );
                                   },
                                 ),
                             ],
-                          ),
-                      ],
-                    ),
-                    ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                      children: [
-                        Text(
-                          policy.sector == 'Higher Education'
-                              ? 'Student consultations'
-                              : 'Learner interventions',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        for (final l in learners)
-                          ListTile(
-                            title: Text(l.fullName),
-                            subtitle: Text(supportSummary(l)),
-                            trailing: const Icon(Icons.add),
-                            onTap: () => addSupport(l),
-                          ),
-                        for (final s in rows('support'))
-                          ListTile(
-                            title: Text(
-                              '${learners.where((l) => l.id == s['learner']).map((l) => l.fullName).join()} · ${s['Concern']}',
-                            ),
-                            subtitle: Text(
-                              '${s['Action / support plan']}\nReview ${s['Review date (YYYY-MM-DD)']} · ${s['Progress / follow-up']}\n${s['Status (open/resolved)']}',
-                            ),
-                            onTap: () async {
-                              final r = await form('Review support plan', {
-                                'Progress / follow-up':
-                                    s['Progress / follow-up'] as String,
-                                'Status (open/resolved)':
-                                    s['Status (open/resolved)'] as String,
-                              });
-                              if (r == null) return;
-                              if (![
-                                'open',
-                                'resolved',
-                              ].contains(r['Status (open/resolved)'])) {
-                                error('Status must be open or resolved.');
-                                return;
-                              }
-                              data['support'] = rows('support')
-                                  .map((v) =>
-                                      v['id'] == s['id'] ? {...v, ...r} : v)
-                                  .toList();
-                              await save();
-                            },
                           ),
                       ],
                     ),

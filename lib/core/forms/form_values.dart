@@ -1,21 +1,28 @@
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 import '../db.dart';
 import '../export/form_data.dart';
 import '../grading.dart';
+import '../teaching.dart';
 import '../models.dart';
 import 'template_fill.dart';
+import 'assistant.dart';
 
-String _num(double? v) => v == null ? '' : (v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2));
+String _num(double? v) => v == null
+    ? ''
+    : (v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2));
 
-Map<String, String> _about(SchoolProfile p, SchoolClass c, List<Learner> learners) => {
+Map<String, String> _about(
+        SchoolProfile p, SchoolClass c, List<Learner> learners) =>
+    {
       'school_name': p.schoolName,
       'school_id': p.schoolId,
       'region': p.region,
       'division': p.division,
       'district': p.district,
       'school_head': p.schoolHead,
-      'sy': p.sy,
+      'sy': c.sy,
       'teacher': p.teacher,
       'grade': c.grade,
       'section': c.section,
@@ -30,7 +37,7 @@ Map<String, String> _learner(Learner l, String sy) {
   final start = int.tryParse(sy.split('-').first) ?? DateTime.now().year;
   return {
     'no': '${l.num}',
-    'name': l.fullName,
+    'name': l.sf1Name,
     'last': l.last,
     'first': l.first,
     'middle': l.middle,
@@ -47,17 +54,75 @@ Map<String, String> _learner(Learner l, String sy) {
 
 /// Gathers the app's data for one form, ready to place on a teacher's layout.
 /// [month] is for SF2, [term] for the class record, [learner] for one report card.
-Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, String form, {DateTime? month, int? term, Learner? learner, List<String>? areas}) async {
+Future<FormValues> buildFormValues(
+    Repo repo, SchoolProfile p, SchoolClass c, String form,
+    {DateTime? month,
+    int? term,
+    Learner? learner,
+    List<String>? areas,
+    List<DateTime>? calendarDates}) async {
+  p = SchoolProfile.fromSettings({
+    ...p.toSettings(),
+    'sy': c.sy,
+    if (c.teachingPolicy.isNotEmpty)
+      'terms': '${TeachingPolicy.decode(c.teachingPolicy).periods}'
+  });
   final all = await repo.learners(c.id);
   final active = all.where((l) => l.isActive).toList();
+  final settings = await repo.settings();
+  final classInputs = readStringMap(settings['forms_class_${c.id}']);
+  Map<String, String> details(Learner l) {
+    final extra = readStringMap(settings[learnerExtraKey(l, c.sy)]);
+    return {
+      ..._learner(l, c.sy),
+      ...extra,
+      for (var n = 1; n <= 8; n++) ...{
+        'book_${n}_issued': extra['book_${c.id}_${n}_issued'] ?? '',
+        'book_${n}_returned': extra['book_${c.id}_${n}_returned'] ?? '',
+      }
+    };
+  }
+
   switch (form) {
+    case 'sf4':
+    case 'sf6':
+    case 'sf7':
+    case 'sf10':
+      final data = jsonDecode(settings[recordStoreKey(p, c.sy, form,
+              period: form == 'sf4'
+                  ? '${(month ?? DateTime.now()).year}-${(month ?? DateTime.now()).month.toString().padLeft(2, '0')}'
+                  : null)] ??
+          '{}') as Map<String, dynamic>;
+      return FormValues(singles: {
+        ..._about(p, c, all),
+        if (learner != null) 'learner_name': learner.fullName,
+        if (learner != null) 'learner_lrn': learner.lrn
+      }, records: [
+        for (final row in (data['rows'] as List?) ?? [])
+          if (form != 'sf10' ||
+              learner == null ||
+              (row as Map)['record_lrn'] == learner.lrn)
+            Map<String, String>.from(row as Map)
+      ]);
+    case 'sf3':
+    case 'sf8':
+      return FormValues(
+          singles: {..._about(p, c, active), ...classInputs},
+          learners: [for (final l in active) LearnerValues(l.sex, details(l))]);
     case 'sf1':
-      return FormValues(singles: _about(p, c, all), learners: [for (final l in all) LearnerValues(l.sex, _learner(l, p.sy))]);
+      return FormValues(
+          singles: _about(p, c, all),
+          learners: [for (final l in all) LearnerValues(l.sex, details(l))]);
     case 'sf2':
       final at = month ?? DateTime.now();
-      final d = await buildSf2Data(repo, p, c, at.year, at.month);
+      final d = await buildSf2Data(repo, p, c, at.year, at.month,
+          calendarDates: calendarDates);
       return FormValues(
-        singles: {..._about(p, c, all), 'month': d.monthLabel, 'school_days': '${d.schoolDays}'},
+        singles: {
+          ..._about(p, c, all),
+          'month': d.monthLabel,
+          'school_days': '${d.schoolDays}'
+        },
         across: {
           'day_numbers': [for (final day in d.days) '${day.day}'],
           'day_letters': [for (final day in d.days) d.weekdayLetter(day)],
@@ -69,8 +134,19 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
           for (final r in d.rows)
             LearnerValues(
               r.learner.sex,
-              {..._learner(r.learner, p.sy), 'absent': '${r.absent}', 'tardy': '${r.tardy}', 'remarks': r.remarks},
-              {'day_marks': [for (final m in r.marks) m == 'A' ? 'x' : (m == 'L' ? 'T' : '')]},
+              {
+                ..._learner(r.learner, c.sy),
+                '_learner_id': r.learner.id,
+                'absent': '${r.absent}',
+                'tardy': '${r.tardy}',
+                'remarks': r.remarks
+              },
+              {
+                'day_marks': [
+                  for (final m in r.marks)
+                    m == 'A' ? 'x' : (m == 'L' ? 'T' : '')
+                ]
+              },
             ),
         ],
       );
@@ -93,12 +169,19 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
         singles: {..._about(p, c, active), ...counts},
         learners: [
           for (final r in d.rows)
-            LearnerValues(r.learner.sex, {..._learner(r.learner, p.sy), 'ga': r.generalAverage ?? '', 'action': r.action, 'below': r.belowPassing.join(', ')}),
+            LearnerValues(r.learner.sex, {
+              ..._learner(r.learner, p.sy),
+              'ga': r.generalAverage ?? '',
+              'action': r.action,
+              'below': r.belowPassing.join(', ')
+            }),
         ],
       );
     case 'sf9':
       final who = learner ?? active.first;
-      final card = (await buildSf9Data(repo, p, c, [who], areas ?? defaultAreas(c.grade))).first;
+      final card = (await buildSf9Data(
+              repo, p, c, [who], areas ?? defaultAreas(c.grade)))
+          .first;
       return FormValues(
         singles: {
           ..._about(p, c, active),
@@ -112,9 +195,16 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
         },
         across: {
           'att_months': [for (final m in card.months) m.label],
-          'att_days': [for (final m in card.months) m.schoolDays == 0 ? '' : '${m.schoolDays}'],
-          'att_present': [for (final m in card.months) m.schoolDays == 0 ? '' : '${m.present}'],
-          'att_absent': [for (final m in card.months) m.schoolDays == 0 ? '' : '${m.absent}'],
+          'att_days': [
+            for (final m in card.months)
+              m.schoolDays == 0 ? '' : '${m.schoolDays}'
+          ],
+          'att_present': [
+            for (final m in card.months) m.schoolDays == 0 ? '' : '${m.present}'
+          ],
+          'att_absent': [
+            for (final m in card.months) m.schoolDays == 0 ? '' : '${m.absent}'
+          ],
         },
         areas: [
           for (final a in card.areas)
@@ -127,21 +217,28 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
         ],
         behaviors: [
           for (final b in [for (var i = 0; i < 7; i++) i])
-            {for (var t = 1; t <= 4; t++) 'value_t$t': card.values[b]?[t] ?? ''},
+            {
+              for (var t = 1; t <= 4; t++) 'value_t$t': card.values[b]?[t] ?? ''
+            },
         ],
       );
   }
   final activities = await repo.activities(c.id);
-  final engine = GradeEngine(c, activities, await repo.scores(c.id), overrides: await repo.overrides(c.id));
+  final engine = GradeEngine(c, activities, await repo.scores(c.id),
+      overrides: await repo.overrides(c.id));
   if (form == 'record') {
     final t = term ?? latestTerm(activities);
     final across = <String, List<String>>{};
     final extra = <String, String>{'term': p.termName(t)};
-    final inComp = {for (final comp in const ['ww', 'pt', 'ex']) comp: activities.where((a) => a.term == t && a.comp == comp).toList()};
+    final inComp = {
+      for (final comp in const ['ww', 'pt', 'ex'])
+        comp: activities.where((a) => a.term == t && a.comp == comp).toList()
+    };
     inComp.forEach((comp, acts) {
       across['${comp}_titles'] = [for (final a in acts) a.title];
       across['${comp}_hps'] = [for (final a in acts) _num(a.hps)];
-      extra['${comp}_hps_total'] = _num(acts.fold<double>(0, (s, a) => s + a.hps));
+      extra['${comp}_hps_total'] =
+          _num(acts.fold<double>(0, (s, a) => s + a.hps));
       extra['${comp}_weight'] = '${engine.weightOf(comp).toInt()}%';
     });
     return FormValues(
@@ -158,13 +255,19 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
                 for (final comp in const ['ww', 'pt', 'ex']) ...{
                   '${comp}_total': _num(r.comps[comp]?.got),
                   '${comp}_ps': _num(r.comps[comp]?.ps),
-                  '${comp}_ws': r.comps[comp]?.ps == null ? '' : _num(r.comps[comp]!.ps! * engine.weightOf(comp) / 100),
+                  '${comp}_ws': r.comps[comp]?.ps == null
+                      ? ''
+                      : _num(r.comps[comp]!.ps! * engine.weightOf(comp) / 100),
                 },
                 'initial': r.hasData ? r.initialGrade.toStringAsFixed(2) : '',
                 'term_grade': r.display,
               },
               {
-                for (final comp in const ['ww', 'pt', 'ex']) '${comp}_scores': [for (final a in inComp[comp]!) _num(engine.scores[a.id]?[l.id])],
+                for (final comp in const ['ww', 'pt', 'ex'])
+                  '${comp}_scores': [
+                    for (final a in inComp[comp]!)
+                      _num(engine.scores[a.id]?[l.id])
+                  ],
               },
             );
           }(),
@@ -180,9 +283,12 @@ Future<FormValues> buildFormValues(Repo repo, SchoolProfile p, SchoolClass c, St
           final f = engine.finalGrade(l.id, p.terms);
           return LearnerValues(l.sex, {
             ..._learner(l, p.sy),
-            for (var t = 1; t <= f.terms.length; t++) 'term_$t': f.terms[t - 1].display,
-            'final': f.finalGrade?.toString() ?? f.letter ?? '',
-            'descriptor': f.finalGrade == null ? '' : descriptor(f.finalGrade!, legacy: c.legacyRules),
+            for (var t = 1; t <= f.terms.length; t++)
+              'term_$t': f.terms[t - 1].display,
+            'final': f.letter ?? f.finalGrade?.toString() ?? '',
+            'descriptor': f.finalGrade == null || c.transmute == 'raw'
+                ? ''
+                : descriptor(f.finalGrade!, legacy: c.legacyRules),
             'remarks': f.remarks,
           });
         }(),

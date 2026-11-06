@@ -11,6 +11,7 @@ import '../reports/reports_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../teaching_screen.dart';
+import '../forms/forms_assistant_screen.dart';
 import 'class_form.dart';
 import 'learners_screen.dart';
 
@@ -67,8 +68,8 @@ class ClassDetailScreen extends StatelessWidget {
     SchoolClass c,
     SchoolClass from,
   ) async {
-    final source = (await store.repo.learners(from.id))
-        .where((l) => l.isActive);
+    final source =
+        (await store.repo.learners(from.id)).where((l) => l.isActive);
     for (final l in source) {
       await store.repo.saveLearner(
         Learner.fromMap({...l.toMap(), 'id': newId(), 'class_id': c.id}),
@@ -83,7 +84,8 @@ class ClassDetailScreen extends StatelessWidget {
     final ok = await confirm(
       context,
       title: 'Delete ${c.title}?',
-      message: 'This removes the class, its learners, attendance, scores and exams from this phone. Make a backup first if you may need them.',
+      message:
+          'This removes the class, its learners, attendance, scores and exams from this phone. Make a backup first if you may need them.',
     );
     if (!ok) return;
     await store.repo.deleteClass(c.id);
@@ -195,8 +197,7 @@ class ClassDetailScreen extends StatelessWidget {
               ],
               const SizedBox(height: 14),
               GridView.count(
-                crossAxisCount:
-                    MediaQuery.sizeOf(context).width < 360 ||
+                crossAxisCount: MediaQuery.sizeOf(context).width < 360 ||
                         MediaQuery.textScalerOf(context).scale(1) > 1.4
                     ? 1
                     : 2,
@@ -210,9 +211,8 @@ class ClassDetailScreen extends StatelessWidget {
                   ActionTile(
                     icon: Icons.fact_check_rounded,
                     title: 'Attendance',
-                    subtitle: d.today.isEmpty
-                        ? 'Not taken today'
-                        : 'Taken today',
+                    subtitle:
+                        d.today.isEmpty ? 'Not taken today' : 'Taken today',
                     color: goodGreen,
                     badge: d.today.isEmpty ? 'To do' : null,
                     onTap: () => push(context, AttendanceScreen(cls: c)),
@@ -244,6 +244,12 @@ class ClassDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               NavRow(
+                  icon: Icons.auto_awesome_outlined,
+                  title: 'Forms Assistant',
+                  subtitle:
+                      'Enter once, fix missing inputs and generate a form pack',
+                  onTap: () => push(context, FormsAssistantScreen(cls: c))),
+              NavRow(
                 icon: Icons.school,
                 title: 'Teaching workspace',
                 subtitle:
@@ -274,29 +280,30 @@ class ClassDetailScreen extends StatelessWidget {
   }
 
   Widget _heroStat(String value, String label) => Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              style:
+                  TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
+            ),
+          ],
         ),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
-        ),
-      ],
-    ),
-  );
+      );
 
   Widget _divider() => Container(
-    width: 1,
-    height: 34,
-    margin: const EdgeInsets.symmetric(horizontal: 12),
-    color: Colors.white.withAlpha(60),
-  );
+        width: 1,
+        height: 34,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        color: Colors.white.withAlpha(60),
+      );
 }

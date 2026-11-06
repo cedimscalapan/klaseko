@@ -13,6 +13,8 @@ import '../core/export/share.dart';
 import '../core/export/form_data.dart' show dayKey;
 import 'widgets.dart';
 import 'grades/score_entry_screen.dart';
+import 'forms/official_forms_screen.dart';
+import 'forms/forms_assistant_screen.dart';
 
 class TeachingScreen extends StatefulWidget {
   const TeachingScreen({super.key, required this.cls});
@@ -91,8 +93,7 @@ class _TeachingScreenState extends State<TeachingScreen> {
                 for (final e in controllers.entries)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child:
-                        e.key.startsWith('Sector') ||
+                    child: e.key.startsWith('Sector') ||
                             e.key.startsWith('Component') ||
                             e.key.startsWith('Type (') ||
                             e.key.startsWith('Status (')
@@ -103,31 +104,30 @@ class _TeachingScreenState extends State<TeachingScreen> {
                               labelText: e.key.startsWith('Sector')
                                   ? 'School setting'
                                   : e.key.startsWith('Component')
-                                  ? 'Grade component'
-                                  : e.key.startsWith('Type (')
-                                  ? 'Assessment type'
-                                  : 'Status',
+                                      ? 'Grade component'
+                                      : e.key.startsWith('Type (')
+                                          ? 'Assessment type'
+                                          : 'Status',
                             ),
                             items: [
-                              for (final value
-                                  in e.key.startsWith('Sector')
-                                      ? [
-                                          'DepEd',
-                                          'Private K–12',
-                                          'Higher Education',
-                                        ]
-                                      : e.key.startsWith('Component')
+                              for (final value in e.key.startsWith('Sector')
+                                  ? [
+                                      'DepEd',
+                                      'Private K–12',
+                                      'Higher Education',
+                                    ]
+                                  : e.key.startsWith('Component')
                                       ? ['ww', 'pt', 'ex']
                                       : e.key.startsWith('Type (')
-                                      ? [
-                                          'assignment',
-                                          'project',
-                                          'laboratory',
-                                          'recitation',
-                                          'practical',
-                                          'group',
-                                        ]
-                                      : ['open', 'resolved'])
+                                          ? [
+                                              'assignment',
+                                              'project',
+                                              'laboratory',
+                                              'recitation',
+                                              'practical',
+                                              'group',
+                                            ]
+                                          : ['open', 'resolved'])
                                 DropdownMenuItem(
                                   value: value,
                                   child: Text(value),
@@ -190,12 +190,10 @@ class _TeachingScreenState extends State<TeachingScreen> {
       'WW weight': '${widget.cls.ww}',
       'PT weight': '${widget.cls.pt}',
       'Exam weight': '${widget.cls.ex}',
-      'Grade bands: minimum=grade (lines)': policy.bands
-          .map((b) => '${b['minimum']}=${b['grade']}')
-          .join('\n'),
-      'Type CONFIRM after checking school policy': policy.confirmed
-          ? 'CONFIRM'
-          : '',
+      'Grade bands: minimum=grade (lines)':
+          policy.bands.map((b) => '${b['minimum']}=${b['grade']}').join('\n'),
+      'Type CONFIRM after checking school policy':
+          policy.confirmed ? 'CONFIRM' : '',
     });
     if (r == null) return;
     try {
@@ -220,10 +218,9 @@ class _TeachingScreenState extends State<TeachingScreen> {
           'Check periods, passing mark and weights (must total 100).',
         );
       final bands = <Map<String, dynamic>>[];
-      for (final line
-          in r['Grade bands: minimum=grade (lines)']!
-              .split('\n')
-              .where((s) => s.trim().isNotEmpty)) {
+      for (final line in r['Grade bands: minimum=grade (lines)']!
+          .split('\n')
+          .where((s) => s.trim().isNotEmpty)) {
         final parts = line.split('=');
         final min = double.parse(parts.first);
         if (parts.length != 2 ||
@@ -298,17 +295,15 @@ class _TeachingScreenState extends State<TeachingScreen> {
       if (codes.any((c) => !outcomes.any((o) => o['code'] == c)))
         throw const FormatException('Add the outcome codes first.');
       final rubric = <Map<String, dynamic>>[];
-      for (final line
-          in r['Rubric: criterion=max points (lines)']!
-              .split('\n')
-              .where((s) => s.trim().isNotEmpty)) {
+      for (final line in r['Rubric: criterion=max points (lines)']!
+          .split('\n')
+          .where((s) => s.trim().isNotEmpty)) {
         final p = line.split('=');
         final max = double.parse(p.last);
         if (p.length != 2 ||
             p.first.trim().isEmpty ||
             !max.isFinite ||
-            max <= 0)
-          throw const FormatException('Check rubric criteria.');
+            max <= 0) throw const FormatException('Check rubric criteria.');
         rubric.add({'name': p.first.trim(), 'max': max});
       }
       if (rubric.isNotEmpty &&
@@ -539,9 +534,7 @@ class _TeachingScreenState extends State<TeachingScreen> {
       if (m['format'] != 'KlaseKoReportTemplate' ||
           m['title'] is! String ||
           m['columns'] is! String ||
-          (m['columns'] as String)
-              .split(',')
-              .any(
+          (m['columns'] as String).split(',').any(
                 (c) => ![
                   'name',
                   'id',
@@ -567,7 +560,9 @@ class _TeachingScreenState extends State<TeachingScreen> {
     final ok = await confirm(
       context,
       title: template ? 'Share report layout?' : 'Share student grades?',
-      message: template ? 'This layout contains no student records.' : 'The exported file contains names and grades. Share it only with an authorized recipient.',
+      message: template
+          ? 'This layout contains no student records.'
+          : 'The exported file contains names and grades. Share it only with an authorized recipient.',
     );
     if (!ok) return;
     if (template) {
@@ -588,8 +583,8 @@ class _TeachingScreenState extends State<TeachingScreen> {
     }
     final cols =
         ((data['columns'] as String?) ?? 'name,id,periods,final,status').split(
-          ',',
-        );
+      ',',
+    );
     String cell(Object? v) {
       var s = '$v';
       if (RegExp(r'^[=+@\-\t\r]').hasMatch(s)) s = "'$s";
@@ -613,8 +608,8 @@ class _TeachingScreenState extends State<TeachingScreen> {
           final w = comp == 'ww'
               ? widget.cls.ww
               : comp == 'pt'
-              ? widget.cls.pt
-              : widget.cls.ex;
+                  ? widget.cls.pt
+                  : widget.cls.ex;
           if (w == 0) continue;
           final selected = acts.where((a) => a.term == t && a.comp == comp);
           final p = outcomePercent(selected, scores, l.id);
@@ -644,14 +639,13 @@ class _TeachingScreenState extends State<TeachingScreen> {
         'name': l.fullName,
         'id': l.lrn,
         'periods': periods.join(' / '),
-        'final': finalPercent == null
-            ? 'Incomplete'
-            : policy.convert(finalPercent),
+        'final':
+            finalPercent == null ? 'Incomplete' : policy.convert(finalPercent),
         'status': finalPercent == null
             ? 'Incomplete'
             : finalPercent >= policy.passing
-            ? 'Passed'
-            : 'Needs support',
+                ? 'Passed'
+                : 'Needs support',
       };
       lines.add(cols.map((c) => cell(row[c])).join(','));
     }
@@ -664,211 +658,227 @@ class _TeachingScreenState extends State<TeachingScreen> {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 5,
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Teaching workspace'),
-        bottom: const TabBar(
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'Policy'),
-            Tab(
-              icon: Icon(Icons.assignment_outlined, size: 20),
-              text: 'Assessments',
-            ),
-            Tab(
-              icon: Icon(Icons.track_changes_rounded, size: 20),
-              text: 'Outcomes',
-            ),
-            Tab(
-              icon: Icon(Icons.volunteer_activism_outlined, size: 20),
-              text: 'Support',
-            ),
-            Tab(
-              icon: Icon(Icons.description_outlined, size: 20),
-              text: 'Reports',
-            ),
-          ],
-        ),
-      ),
-      body: !ready
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              children: [
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    ListTile(
-                      title: Text('${policy.sector} · ${policy.institution}'),
-                      subtitle: Text(
-                        '${policy.periods} periods · ${policy.confirmed ? 'Policy confirmed' : 'Confirm school policy'}',
-                      ),
-                      trailing: const Icon(Icons.settings),
-                      onTap: editPolicy,
-                    ),
-                    TextButton(
-                      onPressed: reusePolicy,
-                      child: const Text('Reuse policy from another class'),
-                    ),
-                  ],
+        length: 5,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Teaching workspace'),
+            bottom: const TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: [
+                Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'Policy'),
+                Tab(
+                  icon: Icon(Icons.assignment_outlined, size: 20),
+                  text: 'Assessments',
                 ),
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    const Text(
-                      'Assessments',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: addActivity,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add assessment and rubric'),
-                    ),
-                    for (final a in acts)
-                      ListTile(
-                        title: Text(a.title),
-                        subtitle: Text(
-                          'Period ${a.term} · ${a.comp} · ${a.hps} points',
-                        ),
-                        onTap: () => scoreRubric(a),
-                      ),
-                  ],
+                Tab(
+                  icon: Icon(Icons.track_changes_rounded, size: 20),
+                  text: 'Outcomes',
                 ),
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    const Text(
-                      'Outcomes and competencies',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: addOutcome,
-                      child: const Text('Add syllabus outcome / competency'),
-                    ),
-                    for (final o in rows('outcomes'))
-                      ExpansionTile(
-                        title: Text('${o['code']}: ${o['description']}'),
-                        subtitle: Text(
-                          '${o['reference']} · target ${o['target']}%',
-                        ),
-                        children: [
-                          for (final l in learners)
-                            Builder(
-                              builder: (context) {
-                                final selected = acts.where(
-                                  (a) =>
-                                      ((data[a.id] as Map?)?['outcomes']
-                                                  as List? ??
-                                              [])
-                                          .contains(o['code']),
-                                );
-                                final p = outcomePercent(
-                                  selected,
-                                  scores,
-                                  l.id,
-                                );
-                                return ListTile(
-                                  title: Text(l.fullName),
-                                  subtitle: Text(
-                                    p == null
-                                        ? 'No assessed evidence'
-                                        : '${p.toStringAsFixed(1)}% · ${p >= (o['target'] as num) ? 'Target met' : 'Needs support'}',
-                                  ),
-                                  onTap: () => addSupport(l),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                  ],
+                Tab(
+                  icon: Icon(Icons.volunteer_activism_outlined, size: 20),
+                  text: 'Support',
                 ),
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    Text(
-                      policy.sector == 'Higher Education'
-                          ? 'Student consultations'
-                          : 'Learner interventions',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    for (final l in learners)
-                      ListTile(
-                        title: Text(l.fullName),
-                        subtitle: Text(supportSummary(l)),
-                        trailing: const Icon(Icons.add),
-                        onTap: () => addSupport(l),
-                      ),
-                    for (final s in rows('support'))
-                      ListTile(
-                        title: Text(
-                          '${learners.where((l) => l.id == s['learner']).map((l) => l.fullName).join()} · ${s['Concern']}',
-                        ),
-                        subtitle: Text(
-                          '${s['Action / support plan']}\nReview ${s['Review date (YYYY-MM-DD)']} · ${s['Progress / follow-up']}\n${s['Status (open/resolved)']}',
-                        ),
-                        onTap: () async {
-                          final r = await form('Review support plan', {
-                            'Progress / follow-up':
-                                s['Progress / follow-up'] as String,
-                            'Status (open/resolved)':
-                                s['Status (open/resolved)'] as String,
-                          });
-                          if (r == null) return;
-                          if (![
-                            'open',
-                            'resolved',
-                          ].contains(r['Status (open/resolved)'])) {
-                            error('Status must be open or resolved.');
-                            return;
-                          }
-                          data['support'] = rows('support')
-                              .map((v) => v['id'] == s['id'] ? {...v, ...r} : v)
-                              .toList();
-                          await save();
-                        },
-                      ),
-                  ],
-                ),
-                ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    const Text(
-                      'Reusable reports',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: reportTemplate,
-                      child: const Text('Configure grade sheet columns'),
-                    ),
-                    TextButton(
-                      onPressed: importTemplate,
-                      child: const Text('Import KlaseKo report layout'),
-                    ),
-                    TextButton(
-                      onPressed: () => export(true),
-                      child: const Text('Share reusable layout'),
-                    ),
-                    FilledButton(
-                      onPressed: () => export(false),
-                      child: const Text('Export institution grade sheet (CSV)'),
-                    ),
-                  ],
+                Tab(
+                  icon: Icon(Icons.description_outlined, size: 20),
+                  text: 'Reports',
                 ),
               ],
             ),
-    ),
-  );
+          ),
+          body: !ready
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  children: [
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                      children: [
+                        ListTile(
+                          title:
+                              Text('${policy.sector} · ${policy.institution}'),
+                          subtitle: Text(
+                            '${policy.periods} periods · ${policy.confirmed ? 'Policy confirmed' : 'Confirm school policy'}',
+                          ),
+                          trailing: const Icon(Icons.settings),
+                          onTap: editPolicy,
+                        ),
+                        TextButton(
+                          onPressed: reusePolicy,
+                          child: const Text('Reuse policy from another class'),
+                        ),
+                      ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                      children: [
+                        const Text(
+                          'Assessments',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: addActivity,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add assessment and rubric'),
+                        ),
+                        for (final a in acts)
+                          ListTile(
+                            title: Text(a.title),
+                            subtitle: Text(
+                              'Period ${a.term} · ${a.comp} · ${a.hps} points',
+                            ),
+                            onTap: () => scoreRubric(a),
+                          ),
+                      ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                      children: [
+                        const Text(
+                          'Outcomes and competencies',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: addOutcome,
+                          child:
+                              const Text('Add syllabus outcome / competency'),
+                        ),
+                        for (final o in rows('outcomes'))
+                          ExpansionTile(
+                            title: Text('${o['code']}: ${o['description']}'),
+                            subtitle: Text(
+                              '${o['reference']} · target ${o['target']}%',
+                            ),
+                            children: [
+                              for (final l in learners)
+                                Builder(
+                                  builder: (context) {
+                                    final selected = acts.where(
+                                      (a) => ((data[a.id] as Map?)?['outcomes']
+                                                  as List? ??
+                                              [])
+                                          .contains(o['code']),
+                                    );
+                                    final p = outcomePercent(
+                                      selected,
+                                      scores,
+                                      l.id,
+                                    );
+                                    return ListTile(
+                                      title: Text(l.fullName),
+                                      subtitle: Text(
+                                        p == null
+                                            ? 'No assessed evidence'
+                                            : '${p.toStringAsFixed(1)}% · ${p >= (o['target'] as num) ? 'Target met' : 'Needs support'}',
+                                      ),
+                                      onTap: () => addSupport(l),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                      children: [
+                        Text(
+                          policy.sector == 'Higher Education'
+                              ? 'Student consultations'
+                              : 'Learner interventions',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        for (final l in learners)
+                          ListTile(
+                            title: Text(l.fullName),
+                            subtitle: Text(supportSummary(l)),
+                            trailing: const Icon(Icons.add),
+                            onTap: () => addSupport(l),
+                          ),
+                        for (final s in rows('support'))
+                          ListTile(
+                            title: Text(
+                              '${learners.where((l) => l.id == s['learner']).map((l) => l.fullName).join()} · ${s['Concern']}',
+                            ),
+                            subtitle: Text(
+                              '${s['Action / support plan']}\nReview ${s['Review date (YYYY-MM-DD)']} · ${s['Progress / follow-up']}\n${s['Status (open/resolved)']}',
+                            ),
+                            onTap: () async {
+                              final r = await form('Review support plan', {
+                                'Progress / follow-up':
+                                    s['Progress / follow-up'] as String,
+                                'Status (open/resolved)':
+                                    s['Status (open/resolved)'] as String,
+                              });
+                              if (r == null) return;
+                              if (![
+                                'open',
+                                'resolved',
+                              ].contains(r['Status (open/resolved)'])) {
+                                error('Status must be open or resolved.');
+                                return;
+                              }
+                              data['support'] = rows('support')
+                                  .map((v) =>
+                                      v['id'] == s['id'] ? {...v, ...r} : v)
+                                  .toList();
+                              await save();
+                            },
+                          ),
+                      ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                      children: [
+                        const Text(
+                          'Reusable reports',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        NavRow(
+                            icon: Icons.auto_awesome_outlined,
+                            title: 'Forms Assistant',
+                            subtitle: 'Reusable inputs and reviewed form packs',
+                            onTap: () => push(context,
+                                FormsAssistantScreen(cls: widget.cls))),
+                        NavRow(
+                            icon: Icons.verified_outlined,
+                            title: 'Official DepEd templates',
+                            subtitle:
+                                'For basic education classes; match grade and curriculum',
+                            onTap: () => push(
+                                context, OfficialFormsScreen(cls: widget.cls))),
+                        TextButton(
+                          onPressed: reportTemplate,
+                          child: const Text('Configure grade sheet columns'),
+                        ),
+                        TextButton(
+                          onPressed: importTemplate,
+                          child: const Text('Import KlaseKo report layout'),
+                        ),
+                        TextButton(
+                          onPressed: () => export(true),
+                          child: const Text('Share reusable layout'),
+                        ),
+                        FilledButton(
+                          onPressed: () => export(false),
+                          child: const Text(
+                              'Export institution grade sheet (CSV)'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ),
+      );
 }

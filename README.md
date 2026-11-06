@@ -103,3 +103,13 @@ Choose DepEd, Private K–12 or Higher Education when creating a class. Open **T
 
 Higher education grading uses institution-defined policies, without a universal CHED grading formula. Official DepEd policy validation and real-device verification remain required before production use.
 - Not affiliated with the Department of Education.
+
+## Official DepEd template library
+
+Open **More → Official DepEd templates**, or use the link inside class reports. The library contains 56 published source editions, including 16 unmodified workbooks available offline (about 5.5 MB). Other reference editions download from official sources and are cached after first use. Files include source attribution and SHA-256 integrity checks.
+
+Filters follow grade, school year, MATATAG rollout and the continuing Strengthened SHS pilot cohort. Historical DO 8 ECR spreadsheets are not recommended for 2026 classes. Current SF9 and new non-pilot SSHS formats require current school guidance; the app does not claim older spreadsheets are compliant replacements. These are blank official originals; generated KlaseKo drafts remain separate. See [sources and applicability](docs/OFFICIAL-FORMS.md).
+
+## Forms Assistant
+
+Open a class → **Forms Assistant** to resolve missing inputs, paste learner or verified school records from Excel, reuse book and assessment data, review period-specific attendance, and generate selected forms as one reviewed pack. Approved mappings support SF1–SF10 and grade records. Pinned reference presets cover SF1, SF2, SF3 and SF8, with row/date capacity checks. School-wide and historical data require verified source rows and explicit coverage review. The new Excel writer preserves source workbook parts rather than rebuilding the layout. See [workflow and limits](docs/FORMS-ASSISTANT.md).

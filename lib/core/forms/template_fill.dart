@@ -2,9 +2,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' as xl;
+import 'workbook_patch.dart';
+import 'assistant.dart' show extraFieldsFor, recordFields;
 
 /// How a piece of data is placed from the cell it is assigned to.
 enum FieldKind {
+  /// Verified administrative or historical rows, not necessarily learners.
+  record,
+
   /// One value in that cell.
   single,
 
@@ -35,6 +40,12 @@ class FormDataField {
 const templateForms = {
   'sf1': 'SF1 School Register',
   'sf2': 'SF2 Daily Attendance',
+  'sf3': 'SF3 Books Issued and Returned',
+  'sf4': 'SF4 School Movement and Attendance',
+  'sf6': 'SF6 School Promotion Summary',
+  'sf7': 'SF7 Personnel Assignments',
+  'sf8': 'SF8 Health and Nutrition',
+  'sf10': 'SF10 Permanent Academic Record',
   'sf5': 'SF5 Promotion and Proficiency',
   'sf9': 'SF9 Report Card',
   'record': 'Class Record',
@@ -82,20 +93,26 @@ const _sf2 = [
   FormDataField('month', 'Month', FieldKind.single),
   FormDataField('school_days', 'School days this month', FieldKind.single),
   FormDataField('day_numbers', 'Dates (goes right)', FieldKind.across),
-  FormDataField('day_letters', 'Weekday letters (goes right)', FieldKind.across),
-  FormDataField('day_marks', 'Daily marks: x or T (goes right on each row)', FieldKind.learnerAcross),
+  FormDataField(
+      'day_letters', 'Weekday letters (goes right)', FieldKind.across),
+  FormDataField('day_marks', 'Daily marks: x or T (goes right on each row)',
+      FieldKind.learnerAcross),
   FormDataField('absent', 'Total absent', FieldKind.learner),
   FormDataField('tardy', 'Total tardy', FieldKind.learner),
   FormDataField('remarks', 'Remarks', FieldKind.learner),
-  FormDataField('present_m', 'Males present per day (goes right)', FieldKind.across),
-  FormDataField('present_f', 'Females present per day (goes right)', FieldKind.across),
-  FormDataField('present_all', 'All present per day (goes right)', FieldKind.across),
+  FormDataField(
+      'present_m', 'Males present per day (goes right)', FieldKind.across),
+  FormDataField(
+      'present_f', 'Females present per day (goes right)', FieldKind.across),
+  FormDataField(
+      'present_all', 'All present per day (goes right)', FieldKind.across),
 ];
 
 List<FormDataField> _sf5() => [
       const FormDataField('ga', 'General average', FieldKind.learner),
       const FormDataField('action', 'Action taken', FieldKind.learner),
-      const FormDataField('below', 'Learning areas below 75', FieldKind.learner),
+      const FormDataField(
+          'below', 'Learning areas below 75', FieldKind.learner),
       for (final (id, label) in const [
         ('promoted', 'Promoted'),
         ('remedial', 'For Summer Remedial Class'),
@@ -106,7 +123,12 @@ List<FormDataField> _sf5() => [
         ('level4', 'Developing (65-74)'),
         ('level5', 'Emerging (below 65)'),
       ])
-        for (final (suffix, who) in const [('m', 'male'), ('f', 'female'), ('t', 'total')]) FormDataField('${id}_$suffix', '$label: $who', FieldKind.single),
+        for (final (suffix, who) in const [
+          ('m', 'male'),
+          ('f', 'female'),
+          ('t', 'total')
+        ])
+          FormDataField('${id}_$suffix', '$label: $who', FieldKind.single),
     ];
 
 const _grades = [
@@ -121,12 +143,20 @@ const _grades = [
 
 List<FormDataField> _record() => [
       const FormDataField('term', 'Term', FieldKind.single),
-      for (final (c, name) in const [('ww', 'Written Work'), ('pt', 'Performance Tasks'), ('ex', 'Examinations')]) ...[
-        FormDataField('${c}_titles', '$name: titles (goes right)', FieldKind.across),
-        FormDataField('${c}_hps', '$name: highest scores (goes right)', FieldKind.across),
-        FormDataField('${c}_hps_total', '$name: total highest score', FieldKind.single),
+      for (final (c, name) in const [
+        ('ww', 'Written Work'),
+        ('pt', 'Performance Tasks'),
+        ('ex', 'Examinations')
+      ]) ...[
+        FormDataField(
+            '${c}_titles', '$name: titles (goes right)', FieldKind.across),
+        FormDataField(
+            '${c}_hps', '$name: highest scores (goes right)', FieldKind.across),
+        FormDataField(
+            '${c}_hps_total', '$name: total highest score', FieldKind.single),
         FormDataField('${c}_weight', '$name: weight', FieldKind.single),
-        FormDataField('${c}_scores', '$name: scores (goes right on each row)', FieldKind.learnerAcross),
+        FormDataField('${c}_scores', '$name: scores (goes right on each row)',
+            FieldKind.learnerAcross),
         FormDataField('${c}_total', '$name: total', FieldKind.learner),
         FormDataField('${c}_ps', '$name: percentage score', FieldKind.learner),
         FormDataField('${c}_ws', '$name: weighted score', FieldKind.learner),
@@ -150,10 +180,14 @@ const _sf9 = [
   FormDataField('area_t4', 'Learning area: quarter 4', FieldKind.area),
   FormDataField('area_final', 'Learning area: final grade', FieldKind.area),
   FormDataField('area_remarks', 'Learning area: remarks', FieldKind.area),
-  FormDataField('att_months', 'Attendance: months (goes right)', FieldKind.across),
-  FormDataField('att_days', 'Attendance: school days (goes right)', FieldKind.across),
-  FormDataField('att_present', 'Attendance: days present (goes right)', FieldKind.across),
-  FormDataField('att_absent', 'Attendance: days absent (goes right)', FieldKind.across),
+  FormDataField(
+      'att_months', 'Attendance: months (goes right)', FieldKind.across),
+  FormDataField(
+      'att_days', 'Attendance: school days (goes right)', FieldKind.across),
+  FormDataField(
+      'att_present', 'Attendance: days present (goes right)', FieldKind.across),
+  FormDataField(
+      'att_absent', 'Attendance: days absent (goes right)', FieldKind.across),
   FormDataField('value_t1', 'Core values: term 1', FieldKind.value),
   FormDataField('value_t2', 'Core values: term 2', FieldKind.value),
   FormDataField('value_t3', 'Core values: term 3', FieldKind.value),
@@ -162,7 +196,25 @@ const _sf9 = [
 
 /// Everything that can be placed on a layout of this form.
 List<FormDataField> fieldsFor(String form) => switch (form) {
-      'sf1' => [..._about, ..._learnerRows, ..._sf1],
+      'sf4' || 'sf6' || 'sf7' || 'sf10' => [
+          ..._about,
+          if (form == 'sf10') ...[
+            const FormDataField('learner_name', 'Learner name (record header)',
+                FieldKind.single),
+            const FormDataField(
+                'learner_lrn', 'LRN (record header)', FieldKind.single)
+          ],
+          for (final e in recordFields[form]!.entries)
+            FormDataField(e.key, e.value, FieldKind.record)
+        ],
+      'sf1' => [..._about, ..._learnerRows, ..._sf1, ...extraFieldsFor(form)],
+      'sf3' => [
+          ..._about,
+          ..._learnerRows,
+          ...extraFieldsFor(form),
+          const FormDataField('remarks', 'Remarks', FieldKind.learner)
+        ],
+      'sf8' => [..._about, ..._learnerRows, ..._sf1, ...extraFieldsFor(form)],
       'sf2' => [..._about, ..._sf2, ..._learnerRows],
       'sf5' => [..._about, ..._learnerRows, ..._sf5()],
       'sf9' => [..._about, ..._sf9],
@@ -178,13 +230,24 @@ class CellMap {
   final int col;
   final String field;
   final String group;
-  const CellMap(this.sheet, this.row, this.col, this.field, [this.group = 'all']);
+  const CellMap(this.sheet, this.row, this.col, this.field,
+      [this.group = 'all']);
 
-  Map<String, Object> toJson() => {'s': sheet, 'r': row, 'c': col, 'f': field, 'g': group};
-  factory CellMap.fromJson(Map<String, dynamic> m) => CellMap(m['s'] as String, m['r'] as int, m['c'] as int, m['f'] as String, (m['g'] as String?) ?? 'all');
+  Map<String, Object> toJson() =>
+      {'s': sheet, 'r': row, 'c': col, 'f': field, 'g': group};
+  factory CellMap.fromJson(Map<String, dynamic> m) => CellMap(
+      m['s'] as String,
+      m['r'] as int,
+      m['c'] as int,
+      m['f'] as String,
+      (m['g'] as String?) ?? 'all');
 
-  static String encode(List<CellMap> maps) => jsonEncode([for (final m in maps) m.toJson()]);
-  static List<CellMap> decode(String text) => [for (final m in jsonDecode(text) as List) CellMap.fromJson(m as Map<String, dynamic>)];
+  static String encode(List<CellMap> maps) =>
+      jsonEncode([for (final m in maps) m.toJson()]);
+  static List<CellMap> decode(String text) => [
+        for (final m in jsonDecode(text) as List)
+          CellMap.fromJson(m as Map<String, dynamic>)
+      ];
 }
 
 class LearnerValues {
@@ -196,12 +259,19 @@ class LearnerValues {
 
 /// The data for one filled form.
 class FormValues {
+  final List<Map<String, String>> records;
   final Map<String, String> singles;
   final Map<String, List<String>> across;
   final List<LearnerValues> learners;
   final List<Map<String, String>> areas;
   final List<Map<String, String>> behaviors;
-  const FormValues({this.singles = const {}, this.across = const {}, this.learners = const [], this.areas = const [], this.behaviors = const []});
+  const FormValues(
+      {this.singles = const {},
+      this.across = const {},
+      this.learners = const [],
+      this.areas = const [],
+      this.behaviors = const [],
+      this.records = const []});
 }
 
 class FillResult {
@@ -213,18 +283,33 @@ class FillResult {
 }
 
 /// Identifiers that look like numbers but must stay exactly as written.
-const _textOnly = {'lrn', 'learner_lrn', 'contact', 'school_id', 'sy'};
+const _textOnly = {
+  'lrn',
+  'learner_lrn',
+  'record_lrn',
+  'person_id',
+  'contact',
+  'school_id',
+  'sy'
+};
 
 /// Writes the values into a copy of the teacher's own Excel file. Only the assigned cells change, so
 /// the layout, wording and formulas of the form stay theirs.
-FillResult fillXlsx(Uint8List bytes, List<CellMap> maps, String form, FormValues v) {
+FillResult fillXlsx(
+    Uint8List bytes, List<CellMap> maps, String form, FormValues v) {
+  if (maps.isEmpty)
+    throw const FormatException('This layout has no assigned input cells.');
+  final edits = <String, Map<String, String>>{};
+  final textCells = <String>{};
   final book = xl.Excel.decodeBytes(bytes);
   final kinds = {for (final f in fieldsFor(form)) f.id: f.kind};
 
   /// True when the form has its own wording in this cell, such as "TOTAL" or "FEMALE".
   bool hasWording(String sheet, int row, int col) {
     final s = book.tables[sheet];
-    final value = s?.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+    final value = s
+        ?.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
+        .value;
     if (value is! xl.TextCellValue) return false;
     final text = value.toString().trim();
     return text.isNotEmpty && num.tryParse(text) == null;
@@ -232,8 +317,13 @@ FillResult fillXlsx(Uint8List bytes, List<CellMap> maps, String form, FormValues
 
   void put(String sheet, int row, int col, String field, String? value) {
     final s = book.tables[sheet];
-    if (s == null || value == null || value.isEmpty) return;
-    final cell = s.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+    if (s == null || value == null) return;
+    final address =
+        xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row).cellId;
+    (edits[sheet] ??= {})[address] = value;
+    if (_textOnly.contains(field)) textCells.add('$sheet!$address');
+    final cell =
+        s.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
     final number = _textOnly.contains(field) ? null : num.tryParse(value);
     cell.value = number is int
         ? xl.IntCellValue(number)
@@ -244,6 +334,13 @@ FillResult fillXlsx(Uint8List bytes, List<CellMap> maps, String form, FormValues
 
   for (final m in maps) {
     switch (kinds[m.field]) {
+      case FieldKind.record:
+        for (var i = 0; i < v.records.length; i++) {
+          if (i > 0 && hasWording(m.sheet, m.row + i, m.col))
+            throw const FormatException(
+                'Administrative or historical rows do not fit. Expand the mapped layout before exporting.');
+          put(m.sheet, m.row + i, m.col, m.field, v.records[i][m.field]);
+        }
       case FieldKind.single:
         put(m.sheet, m.row, m.col, m.field, v.singles[m.field]);
       case FieldKind.across:
@@ -269,19 +366,25 @@ FillResult fillXlsx(Uint8List bytes, List<CellMap> maps, String form, FormValues
   final groups = <String, List<CellMap>>{};
   for (final m in maps) {
     final k = kinds[m.field];
-    if (k == FieldKind.learner || k == FieldKind.learnerAcross) (groups['${m.sheet}|${m.group}'] ??= []).add(m);
+    if (k == FieldKind.learner || k == FieldKind.learnerAcross)
+      (groups['${m.sheet}|${m.group}'] ??= []).add(m);
   }
   groups.forEach((_, list) {
     final first = list.first;
-    final rows = [for (final l in v.learners) if (first.group == 'all' || l.sex == first.group) l];
+    final rows = [
+      for (final l in v.learners)
+        if (first.group == 'all' || l.sex == first.group) l
+    ];
     final start = list.map((m) => m.row).reduce((a, b) => a < b ? a : b);
     final others = [
       for (final o in groups.values)
-        if (o.first.sheet == first.sheet && o.first.group != first.group) o.map((m) => m.row).reduce((a, b) => a < b ? a : b),
+        if (o.first.sheet == first.sheet && o.first.group != first.group)
+          o.map((m) => m.row).reduce((a, b) => a < b ? a : b),
     ].where((r) => r > start);
     final stop = others.isEmpty ? null : others.reduce((a, b) => a < b ? a : b);
     for (var i = 0; i < rows.length; i++) {
-      final blocked = i > 0 && list.any((m) => hasWording(m.sheet, m.row + i, m.col));
+      final blocked =
+          i > 0 && list.any((m) => hasWording(m.sheet, m.row + i, m.col));
       if ((stop != null && start + i >= stop) || blocked) {
         notFitted += rows.length - i;
         break;
@@ -298,16 +401,21 @@ FillResult fillXlsx(Uint8List bytes, List<CellMap> maps, String form, FormValues
       }
     }
   });
-  return FillResult(Uint8List.fromList(book.encode() ?? bytes), notFitted);
+  return FillResult(
+      patchWorkbook(bytes, edits, textFields: textCells), notFitted);
 }
 
 /// The cells of each sheet as text, for showing the layout on screen.
-Map<String, List<List<String>>> previewXlsx(Uint8List bytes, {int maxRows = 150, int maxCols = 60}) {
+Map<String, List<List<String>>> previewXlsx(Uint8List bytes,
+    {int maxRows = 150, int maxCols = 60}) {
   final book = xl.Excel.decodeBytes(bytes);
   return {
     for (final e in book.tables.entries)
       e.key: [
-        for (final row in e.value.rows.take(maxRows)) [for (final c in row.take(maxCols)) c?.value?.toString().trim() ?? ''],
+        for (final row in e.value.rows.take(maxRows))
+          [
+            for (final c in row.take(maxCols)) c?.value?.toString().trim() ?? ''
+          ],
       ],
   };
 }
@@ -321,7 +429,8 @@ const _singleLabels = <String, String>{
   r'^school year$': 'sy',
   r'^(grade|grade level)$': 'grade',
   r'^section$': 'section',
-  r'^(teacher|adviser|class adviser|name of adviser|name of teacher)$': 'teacher',
+  r'^(teacher|adviser|class adviser|name of adviser|name of teacher)$':
+      'teacher',
   r'^(subject|learning area)$': 'subject',
   r'^(school head|principal)$': 'school_head',
   r'^(month|report for the month of)$': 'month',
@@ -354,17 +463,23 @@ List<CellMap> autoMapXlsx(Uint8List bytes, String form) {
   for (final entry in book.tables.entries) {
     final sheet = entry.key;
     final rows = [
-      for (final row in entry.value.rows.take(80)) [for (final c in row) c?.value?.toString().trim() ?? ''],
+      for (final row in entry.value.rows.take(80))
+        [for (final c in row) c?.value?.toString().trim() ?? ''],
     ];
     // Label cells that span several columns: the value starts after the span.
     final spanEnd = <String, int>{};
     for (final span in entry.value.spannedItems) {
       final parts = span.split(':');
       if (parts.length != 2) continue;
-      final a = xl.CellIndex.indexByString(parts[0]), b = xl.CellIndex.indexByString(parts[1]);
+      final a = xl.CellIndex.indexByString(parts[0]),
+          b = xl.CellIndex.indexByString(parts[1]);
       spanEnd['${a.rowIndex}|${a.columnIndex}'] = b.columnIndex;
     }
-    String clean(String t) => t.toLowerCase().replaceAll(RegExp(r"[:*_.]+"), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    String clean(String t) => t
+        .toLowerCase()
+        .replaceAll(RegExp(r"[:*_.]+"), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
 
     // Values beside labels
     for (var r = 0; r < rows.length; r++) {
@@ -372,7 +487,9 @@ List<CellMap> autoMapXlsx(Uint8List bytes, String form) {
         final text = clean(rows[r][c]);
         if (text.isEmpty) continue;
         for (final e in _singleLabels.entries) {
-          if (!allowed.contains(e.value) || used.contains(e.value) || !RegExp(e.key).hasMatch(text)) continue;
+          if (!allowed.contains(e.value) ||
+              used.contains(e.value) ||
+              !RegExp(e.key).hasMatch(text)) continue;
           for (var x = (spanEnd['$r|$c'] ?? c) + 1; x < c + 12; x++) {
             if (x >= rows[r].length || rows[r][x].isEmpty) {
               out.add(CellMap(sheet, r, x, e.value));
@@ -391,7 +508,9 @@ List<CellMap> autoMapXlsx(Uint8List bytes, String form) {
         final text = clean(rows[r][c]);
         if (text.isEmpty) continue;
         for (final e in _columnLabels.entries) {
-          if (allowed.contains(e.value) && !heads.containsValue(e.value) && RegExp(e.key).hasMatch(text)) {
+          if (allowed.contains(e.value) &&
+              !heads.containsValue(e.value) &&
+              RegExp(e.key).hasMatch(text)) {
             heads[c] = e.value;
             break;
           }
@@ -399,7 +518,9 @@ List<CellMap> autoMapXlsx(Uint8List bytes, String form) {
       }
       if (!heads.containsValue('name') || heads.length < 2) continue;
       final nameCol = heads.entries.firstWhere((e) => e.value == 'name').key;
-      String at(int row) => row < rows.length && nameCol < rows[row].length ? clean(rows[row][nameCol]) : '';
+      String at(int row) => row < rows.length && nameCol < rows[row].length
+          ? clean(rows[row][nameCol])
+          : '';
       var start = r + 1;
       var skipped = 0;
       var group = 'all';
@@ -409,18 +530,21 @@ List<CellMap> autoMapXlsx(Uint8List bytes, String form) {
         start++;
         skipped++;
       }
-      heads.forEach((c, field) => out.add(CellMap(sheet, start, c, field, group)));
+      heads.forEach(
+          (c, field) => out.add(CellMap(sheet, start, c, field, group)));
       if (group == 'M') {
         for (var f = start + 1; f < rows.length; f++) {
           if (at(f) == 'female' || at(f).startsWith('female ')) {
-            heads.forEach((c, field) => out.add(CellMap(sheet, f + 1, c, field, 'F')));
+            heads.forEach(
+                (c, field) => out.add(CellMap(sheet, f + 1, c, field, 'F')));
             break;
           }
         }
       }
       break;
     }
-    if (out.isNotEmpty) break; // The first sheet with a match is the form itself.
+    if (out.isNotEmpty)
+      break; // The first sheet with a match is the form itself.
   }
   return out;
 }

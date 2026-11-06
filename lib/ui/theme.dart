@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
-/// KlaseKo palette: a calm, government-style look.
+/// KlaseKo palette: ink, mineral teal and warm metallic accents.
 ///
 /// Light: navy on soft off-white paper, muted gold accent. Dark: soft blue-gray surfaces (never
 /// pure black), slightly dimmed text and desaturated accents, so long evening sessions are easy on
@@ -48,27 +48,34 @@ class AppPalette {
 
   static const light = AppPalette(
     brightness: Brightness.light,
-    primary: Color(0xFF1B4A8C),
-    navyDeep: Color(0xFF0F2D57),
-    gold: Color(0xFF85600F),
+    primary: Color(0xFF245B69),
+    navyDeep: Color(0xFF112E3C),
+    gold: Color(0xFF8A641D),
     success: Color(0xFF2B7348),
     warning: Color(0xFF9A5B00),
     danger: Color(0xFFB0302A),
     info: Color(0xFF2B6575),
     pen: Color(0xFFB0302A),
-    background: Color(0xFFF3F4F6),
+    background: Color(0xFFF5F7F9),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFEDF1F6),
-    border: Color(0xFFD9DEE5),
-    text: Color(0xFF1B2330),
-    textMuted: Color(0xFF586273),
-    hero: [Color(0xFF173E75), Color(0xFF0F2D57)],
-    classColors: [Color(0xFF1B4A8C), Color(0xFF85600F), Color(0xFF2B6575), Color(0xFF7A2E3A), Color(0xFF2B7348), Color(0xFF4F5D75)],
+    surfaceAlt: Color(0xFFEBF1F4),
+    border: Color(0xFFDDE5EB),
+    text: Color(0xFF172D3B),
+    textMuted: Color(0xFF526674),
+    hero: [Color(0xFF234B60), Color(0xFF112E3C)],
+    classColors: [
+      Color(0xFF245B69),
+      Color(0xFF8A641D),
+      Color(0xFF2B6575),
+      Color(0xFF7A2E3A),
+      Color(0xFF2B7348),
+      Color(0xFF4F5D75),
+    ],
   );
 
   static const dark = AppPalette(
     brightness: Brightness.dark,
-    primary: Color(0xFF9DBBEA),
+    primary: Color(0xFF92D5DF),
     navyDeep: Color(0xFF1A2C47),
     gold: Color(0xFFD8B567),
     success: Color(0xFF7CC69A),
@@ -76,14 +83,21 @@ class AppPalette {
     danger: Color(0xFFEE8F86),
     info: Color(0xFF86C1CE),
     pen: Color(0xFFEE8F86),
-    background: Color(0xFF12171E),
-    surface: Color(0xFF1A2029),
-    surfaceAlt: Color(0xFF212A35),
-    border: Color(0xFF2E3846),
+    background: Color(0xFF0E1921),
+    surface: Color(0xFF162630),
+    surfaceAlt: Color(0xFF1D303C),
+    border: Color(0xFF314651),
     text: Color(0xFFE1E5EA),
     textMuted: Color(0xFF9BA5B3),
-    hero: [Color(0xFF1E3352), Color(0xFF172840)],
-    classColors: [Color(0xFF9DBBEA), Color(0xFFD8B567), Color(0xFF86C1CE), Color(0xFFE2A0AA), Color(0xFF7CC69A), Color(0xFFAEB8CC)],
+    hero: [Color(0xFF25485A), Color(0xFF142D3C)],
+    classColors: [
+      Color(0xFF92D5DF),
+      Color(0xFFD8B567),
+      Color(0xFF86C1CE),
+      Color(0xFFE2A0AA),
+      Color(0xFF7CC69A),
+      Color(0xFFAEB8CC),
+    ],
   );
 }
 
@@ -92,7 +106,8 @@ AppPalette _palette = AppPalette.light;
 /// The palette for the theme currently on screen. Set by the app shell whenever the brightness
 /// changes; every screen is then rebuilt (see main.dart).
 AppPalette get palette => _palette;
-void usePalette(Brightness b) => _palette = b == Brightness.dark ? AppPalette.dark : AppPalette.light;
+void usePalette(Brightness b) =>
+    _palette = b == Brightness.dark ? AppPalette.dark : AppPalette.light;
 
 // Semantic color names used across the screens.
 Color get brandBlue => _palette.primary;
@@ -106,17 +121,32 @@ Color get gold => _palette.gold;
 Color get dangerRed => _palette.danger;
 
 /// Navy gradient used on hero headers.
-LinearGradient get heroGradient => LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.hero);
+LinearGradient get heroGradient => LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: _palette.hero,
+    );
 
-bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
-Color cardColor(BuildContext context) => isDark(context) ? AppPalette.dark.surface : AppPalette.light.surface;
-Color mutedText(BuildContext context) => Theme.of(context).colorScheme.onSurfaceVariant;
+bool isDark(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark;
+Color cardColor(BuildContext context) =>
+    isDark(context) ? AppPalette.dark.surface : AppPalette.light.surface;
+Color mutedText(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurfaceVariant;
 
 List<BoxShadow> softShadow(BuildContext context) => isDark(context)
     ? const []
     : const [
-        BoxShadow(color: Color(0x0D0F2D57), blurRadius: 16, offset: Offset(0, 5)),
-        BoxShadow(color: Color(0x0A0F2D57), blurRadius: 2, offset: Offset(0, 1)),
+        BoxShadow(
+          color: Color(0x0D0F2D57),
+          blurRadius: 16,
+          offset: Offset(0, 5),
+        ),
+        BoxShadow(
+          color: Color(0x0A0F2D57),
+          blurRadius: 2,
+          offset: Offset(0, 1),
+        ),
       ];
 
 ThemeData buildTheme(Brightness brightness) {
@@ -138,15 +168,40 @@ ThemeData buildTheme(Brightness brightness) {
     outlineVariant: p.border,
     surfaceContainerHighest: p.surfaceAlt,
     primaryContainer: light ? const Color(0xFFDCE6F4) : const Color(0xFF263A59),
-    onPrimaryContainer: light ? const Color(0xFF0F2D57) : const Color(0xFFD7E3F7),
+    onPrimaryContainer:
+        light ? const Color(0xFF112E3C) : const Color(0xFFD7E3F7),
   );
-  final radius = BorderRadius.circular(14);
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme, fontFamily: 'Lexend');
+  final radius = BorderRadius.circular(16);
+  final base = ThemeData(
+    useMaterial3: true,
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.padded,
+    colorScheme: scheme,
+    fontFamily: 'Lexend',
+  );
   final text = base.textTheme.copyWith(
-    headlineLarge: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.6, height: 1.15),
-    headlineMedium: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4, height: 1.2),
-    headlineSmall: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-    titleLarge: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+    headlineLarge: const TextStyle(
+      fontSize: 30,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.6,
+      height: 1.15,
+    ),
+    headlineMedium: const TextStyle(
+      fontSize: 26,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.4,
+      height: 1.2,
+    ),
+    headlineSmall: const TextStyle(
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.3,
+    ),
+    titleLarge: const TextStyle(
+      fontSize: 19,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.2,
+    ),
     titleMedium: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
     titleSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
     bodyLarge: const TextStyle(fontSize: 16, height: 1.45),
@@ -155,7 +210,8 @@ ThemeData buildTheme(Brightness brightness) {
     labelLarge: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
   );
   return base.copyWith(
-    textTheme: text.apply(bodyColor: p.text, displayColor: p.text),
+    textTheme: text.apply(
+        fontFamily: 'Lexend', bodyColor: p.text, displayColor: p.text),
     scaffoldBackgroundColor: p.background,
     canvasColor: p.background,
     cardColor: p.surface,
@@ -166,91 +222,203 @@ ThemeData buildTheme(Brightness brightness) {
       foregroundColor: p.text,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      scrolledUnderElevation: 0.5,
+      scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(fontFamily: 'Lexend', fontSize: 21, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: p.text),
+      titleTextStyle: TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: 21,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: p.text,
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.surface,
-      border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.border)),
-      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.border)),
-      focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.primary, width: 2)),
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.primary, width: 2),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       labelStyle: TextStyle(color: p.textMuted),
-      hintStyle: TextStyle(color: p.textMuted.withAlpha(170)),
+      hintStyle: TextStyle(color: p.textMuted),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(64, 54),
+        minimumSize: const Size(64, 52),
         backgroundColor: p.primary,
         foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: radius),
-        textStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 16, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(64, 54),
+        minimumSize: const Size(64, 52),
         foregroundColor: p.primary,
         shape: RoundedRectangleBorder(borderRadius: radius),
         side: BorderSide(color: p.border),
-        textStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 16, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        foregroundColor: p.text,
+        shape: RoundedRectangleBorder(borderRadius: radius),
+      ),
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: p.primary,
+      unselectedLabelColor: p.textMuted,
+      indicatorColor: p.primary,
+      dividerColor: p.border,
+      indicatorSize: TabBarIndicatorSize.label,
+      labelStyle: const TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelStyle: const TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: p.surface,
+      selectedIconTheme: IconThemeData(color: p.primary),
+      unselectedIconTheme: IconThemeData(color: p.textMuted),
+      indicatorColor: scheme.primaryContainer,
+      selectedLabelTextStyle: TextStyle(
+        color: p.primary,
+        fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelTextStyle: TextStyle(color: p.textMuted),
+    ),
+    tooltipTheme: TooltipThemeData(
+      waitDuration: const Duration(milliseconds: 500),
+      decoration: BoxDecoration(
+        color: p.text,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      textStyle: TextStyle(color: p.surface),
+    ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: p.primary, textStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 15, fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        foregroundColor: p.primary,
+        textStyle: const TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: light ? p.navyDeep : p.primary,
       foregroundColor: light ? Colors.white : const Color(0xFF0E1A2C),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      extendedTextStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 15, fontWeight: FontWeight.w600),
+      extendedTextStyle: const TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+      ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       height: 72,
       elevation: 0,
       backgroundColor: p.surface,
       indicatorColor: p.primary.withAlpha(light ? 28 : 46),
-      indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(color: s.contains(WidgetState.selected) ? p.primary : p.textMuted, size: 26)),
-      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 12,
-            fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
-            color: s.contains(WidgetState.selected) ? p.primary : p.textMuted,
-          )),
+      indicatorShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (s) => IconThemeData(
+          color: s.contains(WidgetState.selected) ? p.primary : p.textMuted,
+          size: 26,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 12,
+          fontWeight: s.contains(WidgetState.selected)
+              ? FontWeight.w700
+              : FontWeight.w500,
+          color: s.contains(WidgetState.selected) ? p.primary : p.textMuted,
+        ),
+      ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: scheme.primaryContainer,
-        selectedForegroundColor: scheme.onPrimaryContainer,
-        textStyle: const TextStyle(fontFamily: 'Lexend', fontWeight: FontWeight.w600),
+        selectedBackgroundColor: p.primary,
+        selectedForegroundColor: scheme.onPrimary,
+        textStyle: const TextStyle(
+          fontFamily: 'Lexend',
+          fontWeight: FontWeight.w600,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
-    chipTheme: ChipThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: BorderSide(color: p.border)),
-    listTileTheme: const ListTileThemeData(contentPadding: EdgeInsets.symmetric(horizontal: 16)),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      side: BorderSide(color: p.border),
+    ),
+    listTileTheme: const ListTileThemeData(
+      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+    ),
     dividerTheme: DividerThemeData(color: p.border, space: 1),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: p.primary),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: light ? p.navyDeep : const Color(0xFF2A3442),
-      contentTextStyle: const TextStyle(fontFamily: 'Lexend', fontSize: 14.5, color: Colors.white),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      contentTextStyle: const TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: 14.5,
+        color: Colors.white,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
-    dialogTheme: DialogThemeData(backgroundColor: p.surface, surfaceTintColor: Colors.transparent),
+    dialogTheme: DialogThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: p.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
     ),
-    popupMenuTheme: PopupMenuThemeData(color: p.surface, surfaceTintColor: Colors.transparent),
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: ZoomPageTransitionsBuilder(),
-      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-    }),
+    popupMenuTheme: PopupMenuThemeData(
+      color: p.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: ZoomPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
   );
 }

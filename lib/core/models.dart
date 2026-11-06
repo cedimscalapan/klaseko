@@ -1,13 +1,23 @@
 import 'dart:convert';
 
 /// Grade components under DO 015, s. 2026: Written Work, Performance Tasks, Examinations.
-const compLabels = {'ww': 'Written Work', 'pt': 'Performance Tasks', 'ex': 'Examinations'};
+const compLabels = {
+  'ww': 'Written Work',
+  'pt': 'Performance Tasks',
+  'ex': 'Examinations',
+};
 const compShort = {'ww': 'WW', 'pt': 'PT', 'ex': 'EX'};
 
 /// Examination parts. Under DO 015, s. 2026 the EX weight is split ST1 30%, ST2 30%, Term Exam 40%.
-const exSubLabels = {'st1': 'Summative Test 1', 'st2': 'Summative Test 2', 'te': 'Term Examination'};
+const exSubLabels = {
+  'st1': 'Summative Test 1',
+  'st2': 'Summative Test 2',
+  'te': 'Term Examination',
+};
 
 class SchoolClass {
+  /// Loaded from encrypted settings alongside the class; preserved by backups.
+  String teachingPolicy = '';
   final String id;
   String sy;
   String grade;
@@ -50,40 +60,40 @@ class SchoolClass {
   bool get legacyRules => preset.startsWith('do8');
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'sy': sy,
-        'grade': grade,
-        'section': section,
-        'subject': subject,
-        'preset': preset,
-        'ww': ww,
-        'pt': pt,
-        'ex': ex,
-        'ex_split': exSplit ? 1 : 0,
-        'transmute': transmute,
-        'mode': mode,
-        'advisory': advisory ? 1 : 0,
-        'created': created,
-        'archived': archived ? 1 : 0,
-      };
+    'id': id,
+    'sy': sy,
+    'grade': grade,
+    'section': section,
+    'subject': subject,
+    'preset': preset,
+    'ww': ww,
+    'pt': pt,
+    'ex': ex,
+    'ex_split': exSplit ? 1 : 0,
+    'transmute': transmute,
+    'mode': mode,
+    'advisory': advisory ? 1 : 0,
+    'created': created,
+    'archived': archived ? 1 : 0,
+  };
 
   factory SchoolClass.fromMap(Map<String, Object?> m) => SchoolClass(
-        id: m['id'] as String,
-        sy: (m['sy'] ?? '') as String,
-        grade: (m['grade'] ?? '') as String,
-        section: (m['section'] ?? '') as String,
-        subject: (m['subject'] ?? '') as String,
-        preset: (m['preset'] ?? 'core') as String,
-        ww: (m['ww'] as num).toDouble(),
-        pt: (m['pt'] as num).toDouble(),
-        ex: (m['ex'] as num).toDouble(),
-        exSplit: (m['ex_split'] ?? 1) == 1,
-        transmute: (m['transmute'] ?? 'table2026') as String,
-        mode: (m['mode'] ?? 'numeric') as String,
-        advisory: (m['advisory'] ?? 0) == 1,
-        created: (m['created'] ?? 0) as int,
-        archived: (m['archived'] ?? 0) == 1,
-      );
+    id: m['id'] as String,
+    sy: (m['sy'] ?? '') as String,
+    grade: (m['grade'] ?? '') as String,
+    section: (m['section'] ?? '') as String,
+    subject: (m['subject'] ?? '') as String,
+    preset: (m['preset'] ?? 'core') as String,
+    ww: (m['ww'] as num).toDouble(),
+    pt: (m['pt'] as num).toDouble(),
+    ex: (m['ex'] as num).toDouble(),
+    exSplit: (m['ex_split'] ?? 1) == 1,
+    transmute: (m['transmute'] ?? 'table2026') as String,
+    mode: (m['mode'] ?? 'numeric') as String,
+    advisory: (m['advisory'] ?? 0) == 1,
+    created: (m['created'] ?? 0) as int,
+    archived: (m['archived'] ?? 0) == 1,
+  );
 }
 
 class Learner {
@@ -120,47 +130,50 @@ class Learner {
   });
 
   String get fullName {
-    final mi = middle.trim().isEmpty ? '' : ' ${middle.trim()[0].toUpperCase()}.';
+    final mi = middle.trim().isEmpty
+        ? ''
+        : ' ${middle.trim()[0].toUpperCase()}.';
     return '${last.trim()}, ${first.trim()}$mi';
   }
 
-  String get sf1Name => '${last.trim()}, ${first.trim()}${middle.trim().isEmpty ? '' : ', ${middle.trim()}'}';
+  String get sf1Name =>
+      '${last.trim()}, ${first.trim()}${middle.trim().isEmpty ? '' : ', ${middle.trim()}'}';
 
   bool get isActive => status == 'active' || status == 'transferred_in';
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'class_id': classId,
-        'num': num,
-        'lrn': lrn,
-        'last': last,
-        'first': first,
-        'middle': middle,
-        'sex': sex,
-        'birth': birth,
-        'address': address,
-        'guardian': guardian,
-        'contact': contact,
-        'status': status,
-        'remarks': remarks,
-      };
+    'id': id,
+    'class_id': classId,
+    'num': num,
+    'lrn': lrn,
+    'last': last,
+    'first': first,
+    'middle': middle,
+    'sex': sex,
+    'birth': birth,
+    'address': address,
+    'guardian': guardian,
+    'contact': contact,
+    'status': status,
+    'remarks': remarks,
+  };
 
   factory Learner.fromMap(Map<String, Object?> m) => Learner(
-        id: m['id'] as String,
-        classId: m['class_id'] as String,
-        num: (m['num'] ?? 0) as int,
-        lrn: (m['lrn'] ?? '') as String,
-        last: (m['last'] ?? '') as String,
-        first: (m['first'] ?? '') as String,
-        middle: (m['middle'] ?? '') as String,
-        sex: (m['sex'] ?? 'M') as String,
-        birth: (m['birth'] ?? '') as String,
-        address: (m['address'] ?? '') as String,
-        guardian: (m['guardian'] ?? '') as String,
-        contact: (m['contact'] ?? '') as String,
-        status: (m['status'] ?? 'active') as String,
-        remarks: (m['remarks'] ?? '') as String,
-      );
+    id: m['id'] as String,
+    classId: m['class_id'] as String,
+    num: (m['num'] ?? 0) as int,
+    lrn: (m['lrn'] ?? '') as String,
+    last: (m['last'] ?? '') as String,
+    first: (m['first'] ?? '') as String,
+    middle: (m['middle'] ?? '') as String,
+    sex: (m['sex'] ?? 'M') as String,
+    birth: (m['birth'] ?? '') as String,
+    address: (m['address'] ?? '') as String,
+    guardian: (m['guardian'] ?? '') as String,
+    contact: (m['contact'] ?? '') as String,
+    status: (m['status'] ?? 'active') as String,
+    remarks: (m['remarks'] ?? '') as String,
+  );
 }
 
 /// Sorts learners the way DepEd forms list them: males first, then females, alphabetical.
@@ -201,30 +214,30 @@ class Activity {
   });
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'class_id': classId,
-        'term': term,
-        'comp': comp,
-        'sub': sub,
-        'title': title,
-        'hps': hps,
-        'day': day,
-        'exam_id': examId,
-        'created': created,
-      };
+    'id': id,
+    'class_id': classId,
+    'term': term,
+    'comp': comp,
+    'sub': sub,
+    'title': title,
+    'hps': hps,
+    'day': day,
+    'exam_id': examId,
+    'created': created,
+  };
 
   factory Activity.fromMap(Map<String, Object?> m) => Activity(
-        id: m['id'] as String,
-        classId: m['class_id'] as String,
-        term: (m['term'] ?? 1) as int,
-        comp: (m['comp'] ?? 'ww') as String,
-        sub: (m['sub'] ?? '') as String,
-        title: (m['title'] ?? '') as String,
-        hps: (m['hps'] as num).toDouble(),
-        day: (m['day'] ?? '') as String,
-        examId: m['exam_id'] as String?,
-        created: (m['created'] ?? 0) as int,
-      );
+    id: m['id'] as String,
+    classId: m['class_id'] as String,
+    term: (m['term'] ?? 1) as int,
+    comp: (m['comp'] ?? 'ww') as String,
+    sub: (m['sub'] ?? '') as String,
+    title: (m['title'] ?? '') as String,
+    hps: (m['hps'] as num).toDouble(),
+    day: (m['day'] ?? '') as String,
+    examId: m['exam_id'] as String?,
+    created: (m['created'] ?? 0) as int,
+  );
 }
 
 class Exam {
@@ -249,26 +262,26 @@ class Exam {
   });
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'class_id': classId,
-        'term': term,
-        'comp': comp,
-        'sub': sub,
-        'title': title,
-        'instructions': instructions,
-        'created': created,
-      };
+    'id': id,
+    'class_id': classId,
+    'term': term,
+    'comp': comp,
+    'sub': sub,
+    'title': title,
+    'instructions': instructions,
+    'created': created,
+  };
 
   factory Exam.fromMap(Map<String, Object?> m) => Exam(
-        id: m['id'] as String,
-        classId: m['class_id'] as String,
-        term: (m['term'] ?? 1) as int,
-        comp: (m['comp'] ?? 'ex') as String,
-        sub: (m['sub'] ?? '') as String,
-        title: (m['title'] ?? '') as String,
-        instructions: (m['instructions'] ?? '') as String,
-        created: (m['created'] ?? 0) as int,
-      );
+    id: m['id'] as String,
+    classId: m['class_id'] as String,
+    term: (m['term'] ?? 1) as int,
+    comp: (m['comp'] ?? 'ex') as String,
+    sub: (m['sub'] ?? '') as String,
+    title: (m['title'] ?? '') as String,
+    instructions: (m['instructions'] ?? '') as String,
+    created: (m['created'] ?? 0) as int,
+  );
 }
 
 class ExamItem {
@@ -295,31 +308,34 @@ class ExamItem {
   int get choiceCount => type == 'tf' ? 2 : 4;
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'exam_id': examId,
-        'idx': idx,
-        'type': type,
-        'question': question,
-        'choices': jsonEncode(choices),
-        'answer': answer,
-        'competency': competency,
-      };
+    'id': id,
+    'exam_id': examId,
+    'idx': idx,
+    'type': type,
+    'question': question,
+    'choices': jsonEncode(choices),
+    'answer': answer,
+    'competency': competency,
+  };
 
   factory ExamItem.fromMap(Map<String, Object?> m) => ExamItem(
-        id: m['id'] as String,
-        examId: m['exam_id'] as String,
-        idx: (m['idx'] ?? 0) as int,
-        type: (m['type'] ?? 'mc') as String,
-        question: (m['question'] ?? '') as String,
-        choices: (jsonDecode((m['choices'] ?? '[]') as String) as List).map((e) => e.toString()).toList(),
-        answer: (m['answer'] ?? 0) as int,
-        competency: (m['competency'] ?? '') as String,
-      );
+    id: m['id'] as String,
+    examId: m['exam_id'] as String,
+    idx: (m['idx'] ?? 0) as int,
+    type: (m['type'] ?? 'mc') as String,
+    question: (m['question'] ?? '') as String,
+    choices: (jsonDecode((m['choices'] ?? '[]') as String) as List)
+        .map((e) => e.toString())
+        .toList(),
+    answer: (m['answer'] ?? 0) as int,
+    competency: (m['competency'] ?? '') as String,
+  );
 }
 
 /// Answer codes stored per item: 0..3 = A..D, -1 = blank, -2 = more than one shaded.
 /// The latest term that has activities, where the teacher is most likely working now.
-int latestTerm(Iterable<Activity> activities) => activities.fold(1, (t, a) => a.term > t ? a.term : t);
+int latestTerm(Iterable<Activity> activities) =>
+    activities.fold(1, (t, a) => a.term > t ? a.term : t);
 
 const ansBlank = -1;
 const ansMulti = -2;
@@ -342,22 +358,24 @@ class ExamResponse {
   });
 
   Map<String, Object?> toMap() => {
-        'exam_id': examId,
-        'learner_id': learnerId,
-        'answers': jsonEncode(answers),
-        'score': score,
-        'source': source,
-        'updated': updated,
-      };
+    'exam_id': examId,
+    'learner_id': learnerId,
+    'answers': jsonEncode(answers),
+    'score': score,
+    'source': source,
+    'updated': updated,
+  };
 
   factory ExamResponse.fromMap(Map<String, Object?> m) => ExamResponse(
-        examId: m['exam_id'] as String,
-        learnerId: m['learner_id'] as String,
-        answers: (jsonDecode((m['answers'] ?? '[]') as String) as List).map((e) => (e as num).toInt()).toList(),
-        score: (m['score'] ?? 0) as int,
-        source: (m['source'] ?? 'manual') as String,
-        updated: (m['updated'] ?? 0) as int,
-      );
+    examId: m['exam_id'] as String,
+    learnerId: m['learner_id'] as String,
+    answers: (jsonDecode((m['answers'] ?? '[]') as String) as List)
+        .map((e) => (e as num).toInt())
+        .toList(),
+    score: (m['score'] ?? 0) as int,
+    source: (m['source'] ?? 'manual') as String,
+    updated: (m['updated'] ?? 0) as int,
+  );
 }
 
 int scoreAnswers(List<ExamItem> items, List<int> answers) {
@@ -368,7 +386,8 @@ int scoreAnswers(List<ExamItem> items, List<int> answers) {
   return s;
 }
 
-String letterOf(int code) => code >= 0 && code < 4 ? 'ABCD'[code] : (code == ansMulti ? '*' : '-');
+String letterOf(int code) =>
+    code >= 0 && code < 4 ? 'ABCD'[code] : (code == ansMulti ? '*' : '-');
 
 /// School profile used on every DepEd form header.
 class SchoolProfile {
@@ -401,34 +420,34 @@ class SchoolProfile {
   });
 
   Map<String, String> toSettings() => {
-        'teacher': teacher,
-        'school_name': schoolName,
-        'school_id': schoolId,
-        'region': region,
-        'division': division,
-        'district': district,
-        'school_head': schoolHead,
-        'sy': sy,
-        'terms': '$terms',
-        'paper': paper,
-        'theme_mode': themeMode,
-        'sheet_size': sheetSize,
-      };
+    'teacher': teacher,
+    'school_name': schoolName,
+    'school_id': schoolId,
+    'region': region,
+    'division': division,
+    'district': district,
+    'school_head': schoolHead,
+    'sy': sy,
+    'terms': '$terms',
+    'paper': paper,
+    'theme_mode': themeMode,
+    'sheet_size': sheetSize,
+  };
 
   factory SchoolProfile.fromSettings(Map<String, String> s) => SchoolProfile(
-        teacher: s['teacher'] ?? '',
-        schoolName: s['school_name'] ?? '',
-        schoolId: s['school_id'] ?? '',
-        region: s['region'] ?? '',
-        division: s['division'] ?? '',
-        district: s['district'] ?? '',
-        schoolHead: s['school_head'] ?? '',
-        sy: s['sy'] ?? '2026-2027',
-        terms: int.tryParse(s['terms'] ?? '') ?? 3,
-        paper: s['paper'] ?? 'letter',
-        themeMode: s['theme_mode'] ?? 'system',
-        sheetSize: s['sheet_size'] ?? 'full',
-      );
+    teacher: s['teacher'] ?? '',
+    schoolName: s['school_name'] ?? '',
+    schoolId: s['school_id'] ?? '',
+    region: s['region'] ?? '',
+    division: s['division'] ?? '',
+    district: s['district'] ?? '',
+    schoolHead: s['school_head'] ?? '',
+    sy: s['sy'] ?? '2026-2027',
+    terms: int.tryParse(s['terms'] ?? '') ?? 3,
+    paper: s['paper'] ?? 'letter',
+    themeMode: s['theme_mode'] ?? 'system',
+    sheetSize: s['sheet_size'] ?? 'full',
+  );
 
   String termLabel(int t) => terms == 4 ? 'Q$t' : 'T$t';
   String termName(int t) => terms == 4 ? 'Quarter $t' : 'Term $t';
@@ -441,11 +460,28 @@ class FormTemplate {
   String name;
   String mapping;
   final int created;
-  FormTemplate({required this.id, required this.form, required this.name, required this.mapping, required this.created});
+  FormTemplate({
+    required this.id,
+    required this.form,
+    required this.name,
+    required this.mapping,
+    required this.created,
+  });
 
-  Map<String, Object?> toMap() => {'id': id, 'form': form, 'name': name, 'mapping': mapping, 'created': created};
-  factory FormTemplate.fromMap(Map<String, Object?> m) =>
-      FormTemplate(id: m['id'] as String, form: m['form'] as String, name: m['name'] as String, mapping: m['mapping'] as String, created: m['created'] as int);
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'form': form,
+    'name': name,
+    'mapping': mapping,
+    'created': created,
+  };
+  factory FormTemplate.fromMap(Map<String, Object?> m) => FormTemplate(
+    id: m['id'] as String,
+    form: m['form'] as String,
+    name: m['name'] as String,
+    mapping: m['mapping'] as String,
+    created: m['created'] as int,
+  );
 }
 
 /// A form the teacher has made, filed for finding again.
@@ -476,31 +512,30 @@ class ArchiveEntry {
   });
 
   Map<String, Object?> toMap(String id) => {
-        'id': id,
-        'class_id': classId,
-        'class_title': classTitle,
-        'subject': subject,
-        'sy': sy,
-        'form': form,
-        'term': term,
-        'period': period,
-        'title': title,
-        'mime': mime,
-        'created': created,
-      };
+    'id': id,
+    'class_id': classId,
+    'class_title': classTitle,
+    'subject': subject,
+    'sy': sy,
+    'form': form,
+    'term': term,
+    'period': period,
+    'title': title,
+    'mime': mime,
+    'created': created,
+  };
 
   factory ArchiveEntry.fromMap(Map<String, Object?> m) => ArchiveEntry(
-        id: m['id'] as String,
-        classId: m['class_id'] as String,
-        classTitle: m['class_title'] as String,
-        subject: m['subject'] as String,
-        sy: m['sy'] as String,
-        form: m['form'] as String,
-        term: m['term'] as int?,
-        period: (m['period'] ?? '') as String,
-        title: m['title'] as String,
-        mime: m['mime'] as String,
-        created: m['created'] as int,
-      );
+    id: m['id'] as String,
+    classId: m['class_id'] as String,
+    classTitle: m['class_title'] as String,
+    subject: m['subject'] as String,
+    sy: m['sy'] as String,
+    form: m['form'] as String,
+    term: m['term'] as int?,
+    period: (m['period'] ?? '') as String,
+    title: m['title'] as String,
+    mime: m['mime'] as String,
+    created: m['created'] as int,
+  );
 }
-

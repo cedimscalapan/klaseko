@@ -95,5 +95,11 @@ Tested with a JavaScript copy of the reader on simulated photos: on 17 hard case
 - Real-device testing of the scanner, printing and Excel files is still needed.
 - SF9 uses the K-12 core values section; check it against the SF9 template your division issues for SY 2026-2027.
 - SF10 is not included yet.
-- Backup files are plain JSON. Keep them private.
+- New backup files are password encrypted. Older plain JSON backups can still be restored.
+
+## School profiles and teaching workspace
+
+Choose DepEd, Private K–12 or Higher Education when creating a class. Open **Teaching workspace** from the class page to configure and confirm school grading policies, reuse a policy across classes, add assessment types and rubrics, map syllabus outcomes, track learner support, and configure or import reusable CSV grade sheet layouts. See [Teaching workspace](docs/TEACHING-WORKSPACE.md) for supported formats and policy setup.
+
+Higher education grading uses institution-defined policies, without a universal CHED grading formula. Official DepEd policy validation and real-device verification remain required before production use.
 - Not affiliated with the Department of Education.

@@ -30,28 +30,92 @@ class _ShellState extends State<Shell> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) go(0);
       },
-      child: Scaffold(
-        body: IndexedStack(index: _tab, children: [
-          HomeScreen(onGo: go),
-          const ClassesScreen(),
-          const CheckHubScreen(),
-          const MoreScreen(),
-        ]),
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withAlpha(90))),
-          ),
-          child: NavigationBar(
-            selectedIndex: _tab,
-            onDestinationSelected: go,
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Today'),
-              NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups_rounded), label: 'Classes'),
-              NavigationDestination(icon: Icon(Icons.document_scanner_outlined), selectedIcon: Icon(Icons.document_scanner_rounded), label: 'Check'),
-              NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'More'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          final pages = IndexedStack(
+            index: _tab,
+            children: [
+              HomeScreen(onGo: go),
+              const ClassesScreen(),
+              const CheckHubScreen(),
+              const MoreScreen(),
             ],
-          ),
-        ),
+          );
+          const destinations = [
+            NavigationDestination(
+              icon: Icon(Icons.space_dashboard_outlined),
+              selectedIcon: Icon(Icons.space_dashboard_rounded),
+              label: 'Today',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.auto_stories_outlined),
+              selectedIcon: Icon(Icons.auto_stories_rounded),
+              label: 'Classes',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.document_scanner_outlined),
+              selectedIcon: Icon(Icons.document_scanner_rounded),
+              label: 'Check papers',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.tune_outlined),
+              selectedIcon: Icon(Icons.tune_rounded),
+              label: 'More',
+            ),
+          ];
+          return Scaffold(
+            body: Row(
+              children: [
+                if (wide)
+                  SafeArea(
+                    child: NavigationRail(
+                      selectedIndex: _tab,
+                      onDestinationSelected: go,
+                      labelType: NavigationRailLabelType.all,
+                      minWidth: 100,
+                      leading: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Icon(Icons.school_rounded, size: 32),
+                      ),
+                      destinations: [
+                        for (final d in destinations)
+                          NavigationRailDestination(
+                            icon: d.icon,
+                            selectedIcon: d.selectedIcon,
+                            label: Text(d.label),
+                          ),
+                      ],
+                    ),
+                  ),
+                if (wide)
+                  VerticalDivider(
+                    width: 1,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                Expanded(child: pages),
+              ],
+            ),
+            bottomNavigationBar: wide
+                ? null
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: NavigationBar(
+                      selectedIndex: _tab,
+                      onDestinationSelected: go,
+                      labelBehavior:
+                          NavigationDestinationLabelBehavior.alwaysShow,
+                      destinations: destinations,
+                    ),
+                  ),
+          );
+        },
       ),
     );
   }

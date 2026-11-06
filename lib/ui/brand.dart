@@ -8,12 +8,13 @@ class Brand {
   static const meaning = '"Klase ko" means "my class".';
   static const tagline = 'Isang entry, tapos na ang forms.';
   static const taglineEn = 'One entry, and your forms are done.';
-  static const description = 'Class records, exams and paper checking for DepEd teachers. Works offline.';
+  static const description =
+      'Class records, assessments and progress for every teaching day. Works offline.';
   static const version = '1.0.0';
 
   // Brand colors: the same in light and dark themes, so the logo always looks the same.
-  static const navy = Color(0xFF173E75);
-  static const navyDeep = Color(0xFF0F2D57);
+  static const navy = Color(0xFF234B60);
+  static const navyDeep = Color(0xFF112E3C);
   static const gold = Color(0xFFD8B567);
 }
 
@@ -29,10 +30,10 @@ class BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(painter: _MarkPainter(plain: plain)),
-      );
+    width: size,
+    height: size,
+    child: CustomPaint(painter: _MarkPainter(plain: plain)),
+  );
 }
 
 class _MarkPainter extends CustomPainter {
@@ -45,8 +46,15 @@ class _MarkPainter extends CustomPainter {
     if (!plain) {
       final rect = Offset.zero & size;
       final paint = Paint()
-        ..shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Brand.navy, Brand.navyDeep]).createShader(rect);
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.225)), paint);
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Brand.navy, Brand.navyDeep],
+        ).createShader(rect);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.225)),
+        paint,
+      );
     }
     final symbolScale = plain ? 1.12 : 1.0; // the plain mark uses the whole box
     final c = Offset(size.width / 2, size.height / 2);
@@ -56,7 +64,9 @@ class _MarkPainter extends CustomPainter {
     final letter = Path();
     for (final shape in _letterK) {
       for (var i = 0; i < shape.length; i += 2) {
-        final p = bubble + Offset(k((shape[i] - 418) * 0.48), k((350 - shape[i + 1]) * 0.48));
+        final p =
+            bubble +
+            Offset(k((shape[i] - 418) * 0.48), k((350 - shape[i + 1]) * 0.48));
         if (i == 0) {
           letter.moveTo(p.dx, p.dy);
         } else {
@@ -66,7 +76,11 @@ class _MarkPainter extends CustomPainter {
       letter.close();
     }
     canvas.drawPath(letter, Paint()..color = Brand.navyDeep);
-    canvas.drawCircle(c + Offset(k(246), k(-230)), k(100), Paint()..color = Brand.gold);
+    canvas.drawCircle(
+      c + Offset(k(246), k(-230)),
+      k(100),
+      Paint()..color = Brand.gold,
+    );
   }
 
   /// The "K" of Lexend ExtraBold in font units (y up): upper arm, stem and lower leg.
@@ -93,31 +107,65 @@ class BrandWordmark extends StatelessWidget {
     final main = onDark ? Colors.white : palette.text;
     final accent = onDark ? Brand.gold : gold;
     return Text.rich(
-      TextSpan(children: [
-        TextSpan(text: 'Klase', style: TextStyle(color: main)),
-        TextSpan(text: 'Ko', style: TextStyle(color: accent)),
-      ]),
-      style: TextStyle(fontFamily: 'Lexend', fontSize: size, fontWeight: FontWeight.w800, letterSpacing: -0.02 * size, height: 1.1),
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'Klase',
+            style: TextStyle(color: main),
+          ),
+          TextSpan(
+            text: 'Ko',
+            style: TextStyle(color: accent),
+          ),
+        ],
+      ),
+      style: TextStyle(
+        fontFamily: 'Lexend',
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.02 * size,
+        height: 1.1,
+      ),
     );
   }
 }
 
 /// Symbol and name side by side, with an optional tagline underneath.
 class BrandLogo extends StatelessWidget {
-  const BrandLogo({super.key, this.size = 40, this.showTagline = false, this.onDark = false});
+  const BrandLogo({
+    super.key,
+    this.size = 40,
+    this.showTagline = false,
+    this.onDark = false,
+  });
   final double size;
   final bool showTagline;
   final bool onDark;
 
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        BrandMark(size: size),
-        SizedBox(width: size * 0.3),
-        Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      BrandMark(size: size),
+      SizedBox(width: size * 0.3),
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           BrandWordmark(size: size * 0.62, onDark: onDark),
           if (showTagline)
-            Text(Brand.tagline,
-                style: TextStyle(fontSize: size * 0.28, color: onDark ? Colors.white.withAlpha(200) : mutedText(context), fontWeight: FontWeight.w500)),
-        ]),
-      ]);
+            Text(
+              Brand.tagline,
+              style: TextStyle(
+                fontSize: size * 0.28,
+                color: onDark
+                    ? Colors.white.withAlpha(200)
+                    : mutedText(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      ),
+    ],
+  );
 }
